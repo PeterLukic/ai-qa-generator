@@ -370,6 +370,12 @@ async function callGroq(
           ],
 
           temperature: 0.2,
+
+          reasoning_effort: "low",
+
+          include_reasoning: false,
+
+          max_completion_tokens: 8192,
         }),
       }
     );
@@ -461,7 +467,7 @@ export async function POST(
       dom,
       numberOfTests = 10,
       testCaseFormat =
-        "detailed",
+      "detailed",
 
       apiKey,
       generatorModel,
@@ -514,7 +520,7 @@ export async function POST(
     if (
       !generatorModel ||
       typeof generatorModel !==
-        "string"
+      "string"
     ) {
       return NextResponse.json(
         {
@@ -550,7 +556,7 @@ export async function POST(
     if (
       !reviewerModel ||
       typeof reviewerModel !==
-        "string"
+      "string"
     ) {
       return NextResponse.json(
         {
@@ -838,10 +844,10 @@ ${dom}
 GENERATED QA SUITE:
 
 ${JSON.stringify(
-  generatorData,
-  null,
-  2
-)}
+      generatorData,
+      null,
+      2
+    )}
 `;
 
     const reviewerContent =
