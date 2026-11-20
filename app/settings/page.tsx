@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useEffect,
   useState,
@@ -30,6 +31,11 @@ export default function SettingsPage() {
     apiKey,
     setApiKey,
   ] = useState("");
+
+  const [
+    showApiKey,
+    setShowApiKey,
+  ] = useState(false);
 
   const [
     generatorModel,
@@ -94,7 +100,6 @@ export default function SettingsPage() {
       );
     }
 
-    // Old Ollama model values are ignored
     if (
       storedGenerator &&
       validModels.includes(
@@ -225,12 +230,10 @@ export default function SettingsPage() {
           null
         );
 
-        // Test Generator
         await testModel(
           generatorModel
         );
 
-        // Test Reviewer only if different
         if (
           reviewerModel !==
           generatorModel
@@ -313,26 +316,71 @@ export default function SettingsPage() {
               the current browser tab session.
             </p>
 
-            <input
-              type="password"
-              value={
-                apiKey
-              }
-              onChange={(
-                event
-              ) => {
-                setApiKey(
-                  event.target.value
-                );
+            {/* API KEY INPUT + EYE */}
 
-                setConnectionResult(
-                  null
-                );
-              }}
-              placeholder="Enter your Groq API key"
-              autoComplete="off"
-              className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-gray-900 outline-none focus:border-blue-500"
-            />
+            <div className="relative mt-4">
+
+              <input
+                type={
+                  showApiKey
+                    ? "text"
+                    : "password"
+                }
+                value={
+                  apiKey
+                }
+                onChange={(
+                  event
+                ) => {
+                  setApiKey(
+                    event.target.value
+                  );
+
+                  setConnectionResult(
+                    null
+                  );
+                }}
+                placeholder="Enter your Groq API key"
+                autoComplete="off"
+                className="w-full rounded-lg border border-gray-300 py-3 pl-3 pr-16 text-gray-900 outline-none focus:border-blue-500"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowApiKey(
+                    (current) =>
+                      !current
+                  )
+                }
+                aria-label={
+                  showApiKey
+                    ? "Hide API key"
+                    : "Show API key"
+                }
+                title={
+                  showApiKey
+                    ? "Hide API key"
+                    : "Show API key"
+                }
+                className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg transition hover:bg-blue-50"
+              >
+
+                <Image
+                  src="/password.png"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className={`h-8 w-8 object-contain transition ${
+                    showApiKey
+                      ? "opacity-100"
+                      : "opacity-80"
+                  }`}
+                />
+
+              </button>
+
+            </div>
 
           </div>
 
