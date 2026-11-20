@@ -24,3 +24,25 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* =========================================
+   GLOBAL SELECT / DROPDOWN ARROW
+========================================= */
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  background-image: url("/double-chevron-down.png");
+  background-repeat: no-repeat;
+
+  /* pomera strelicu malo ulevo */
+  background-position: right 1.25rem center;
+
+  /* veličina ikonice */
+  background-size: 12px 12px;
+
+  /* prostor da tekst ne ide preko ikonice */
+  padding-right: 3rem !important;
+}
