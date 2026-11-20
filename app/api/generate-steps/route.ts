@@ -3,16 +3,12 @@ import { NextResponse } from "next/server";
 import { getStepsPrompt } from "@/lib/prompts/stepsPrompt";
 
 // =====================================================
-// ALLOWED OLLAMA MODELS
+// ALLOWED GROQ MODELS
 // =====================================================
 
 const ALLOWED_MODELS = [
-  "gemma4:31b",
-  "gpt-oss:20b",
-  "gpt-oss:120b",
-  "nemotron-3-nano:30b",
-  "nemotron-3-super",
-  "nemotron-3-ultra",
+  "openai/gpt-oss-20b",
+  "openai/gpt-oss-120b",
 ] as const;
 
 // =====================================================
@@ -40,21 +36,21 @@ function cleanCode(content: string): string {
 }
 
 // =====================================================
-// CALL OLLAMA CLOUD
+// CALL GROQ
 // =====================================================
 
-async function callOllama(
+async function callGroq(
   apiKey: string,
   model: string,
   prompt: string
 ): Promise<string> {
   const response = await fetch(
-    "https://ollama.com/api/chat",
+    "https://api.groq.com/openai/v1/chat/completions",
     {
       method: "POST",
 
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey.trim()}`,
         "Content-Type": "application/json",
       },
 
@@ -68,7 +64,7 @@ async function callOllama(
           },
         ],
 
-        stream: false,
+        temperature: 0.2,
       }),
     }
   );
@@ -78,7 +74,7 @@ async function callOllama(
       await response.text();
 
     console.error(
-      `Ollama request failed for ${model}:`,
+      `Groq request failed for ${model}:`,
       response.status,
       errorText
     );
@@ -88,12 +84,24 @@ async function callOllama(
       response.status === 403
     ) {
       throw new Error(
-        "Invalid or unauthorized Ollama API key."
+        "Invalid or unauthorized Groq API key."
+      );
+    }
+
+    if (response.status === 429) {
+      throw new Error(
+        "Groq rate limit reached. Please wait and try again."
+      );
+    }
+
+    if (response.status === 413) {
+      throw new Error(
+        "The supplied Feature or POM is too large for the Groq request."
       );
     }
 
     throw new Error(
-      `Ollama model "${model}" failed with status ${response.status}.`
+      `Groq model "${model}" failed with status ${response.status}.`
     );
   }
 
@@ -101,14 +109,15 @@ async function callOllama(
     await response.json();
 
   const content =
-    data?.message?.content;
+    data?.choices?.[0]
+      ?.message?.content;
 
   if (
     !content ||
     typeof content !== "string"
   ) {
     throw new Error(
-      `Ollama model "${model}" returned an empty response.`
+      `Groq model "${model}" returned an empty response.`
     );
   }
 
@@ -127,7 +136,6 @@ export async function POST(request: Request) {
     const {
       featureContent,
       pomContent,
-
       apiKey,
       generatorModel,
       reviewerModel,
@@ -172,17 +180,18 @@ export async function POST(request: Request) {
     }
 
     // =================================================
-    // VALIDATE API KEY
+    // VALIDATE GROQ API KEY
     // =================================================
 
     if (
       !apiKey ||
-      typeof apiKey !== "string"
+      typeof apiKey !== "string" ||
+      !apiKey.trim()
     ) {
       return NextResponse.json(
         {
           error:
-            "Ollama API key is required. Configure it in Settings.",
+            "Groq API key is required. Configure it in Settings.",
         },
         {
           status: 400,
@@ -230,21 +239,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // =================================================
-    // LOG
-    // =================================================
-
     console.log(
       "Generating BDD step definitions..."
     );
 
     console.log(
-      "Generator:",
+      "Groq Generator:",
       generatorModel
     );
 
     console.log(
-      "Reviewer:",
+      "Groq Reviewer:",
       reviewerModel
     );
 
@@ -271,7 +276,7 @@ export async function POST(request: Request) {
       );
 
     const generatedContent =
-      await callOllama(
+      await callGroq(
         apiKey,
         generatorModel,
         generationPrompt
@@ -511,15 +516,6 @@ Feature AND supported by the inputs.
 30. If a step is descriptive and no action is needed,
 an intentionally empty implementation is acceptable.
 
-Example:
-
-When(
-  "the user views the available information",
-  async () => {
-    // Descriptive BDD step; no browser action required.
-  }
-);
-
 =====================================================
 ASSERTION RULES
 =====================================================
@@ -529,23 +525,8 @@ ASSERTION RULES
 32. Assertions against application elements must use
     public POM locators.
 
-GOOD:
-
-await expect(
-  pageObject.loginButton
-).toBeVisible();
-
-BAD:
-
-await expect(
-  page.getByRole("button", {
-    name: "Login"
-  })
-).toBeVisible();
-
 33. page.title() may be used when the Feature explicitly
-    requires page-title verification because this is browser
-    metadata rather than a recreated application selector.
+    requires page-title verification.
 
 34. If the POM does not expose the required application
     element, use TODO rather than inventing a locator.
@@ -561,26 +542,11 @@ PAGE OBJECT INSTANTIATION
 
 37. Inspect the actual constructor.
 
-If the POM has:
-
-constructor(page: Page)
-
-a valid pattern is:
-
-const pageObject =
-  new ActualClassName(page);
-
 38. If a POM instance is explicitly supplied through
     fixtures, reuse it.
 
-39. Do NOT invent fixture names such as:
-
-pageLogin
-pageManager
-pages
-loginPage
-
-unless explicitly supported by the inputs.
+39. Do NOT invent fixture names unless explicitly
+    supported by the inputs.
 
 =====================================================
 IMPORT RULES
@@ -606,23 +572,18 @@ BrowserContext
 43. Import Playwright types from @playwright/test
 when needed.
 
-For example:
-
-import {
-  expect,
-  Page
-} from "@playwright/test";
-
 44. If expect is not used, do not import expect.
 
-45. If Page is not used as a TypeScript type, do not import Page.
+45. If Page is not used as a TypeScript type,
+    do not import Page.
 
 46. Remove unused imports.
 
 47. Import the actual supplied POM class.
 
 48. If the exact Page Object path cannot be inferred,
-use a simple adaptable relative path based on the class name.
+    use a simple adaptable relative path based on
+    the class name.
 
 =====================================================
 NO UNSAFE TYPES
@@ -634,9 +595,11 @@ any
 unknown casts
 keyof hacks
 
-unless absolutely unavoidable for legitimate TypeScript reasons.
+unless absolutely unavoidable for legitimate
+TypeScript reasons.
 
-50. Never use unsafe types merely to bypass a POM design issue.
+50. Never use unsafe types merely to bypass
+    a POM design issue.
 
 =====================================================
 STEP IMPLEMENTATION QUALITY
@@ -728,7 +691,7 @@ ${generatedCode}
 `;
 
     const reviewedContent =
-      await callOllama(
+      await callGroq(
         apiKey,
         reviewerModel,
         reviewerPrompt
@@ -750,11 +713,13 @@ ${generatedCode}
         `${generatorModel} + ${reviewerModel}`,
 
       workflow: {
+        provider: "groq",
         generatorModel,
         reviewerModel,
       },
 
-      code: finalCode,
+      code:
+        finalCode,
     });
 
   } catch (error) {
@@ -770,7 +735,8 @@ ${generatedCode}
 
     return NextResponse.json(
       {
-        error: message,
+        error:
+          message,
       },
       {
         status: 500,

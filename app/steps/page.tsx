@@ -70,23 +70,29 @@ export default function StepsPage() {
     }
 
     // =================================================
-    // LOAD SETTINGS
+    // LOAD GROQ SETTINGS
     // =================================================
 
     const apiKey =
-      sessionStorage.getItem("ollamaApiKey");
+      sessionStorage.getItem(
+        "groqApiKey"
+      );
 
     const generatorModel =
-      localStorage.getItem("generatorModel") ||
-      "gpt-oss:20b";
+      localStorage.getItem(
+        "generatorModel"
+      ) ||
+      "openai/gpt-oss-20b";
 
     const reviewerModel =
-      localStorage.getItem("reviewerModel") ||
-      "gpt-oss:120b";
+      localStorage.getItem(
+        "reviewerModel"
+      ) ||
+      "openai/gpt-oss-120b";
 
     if (!apiKey) {
       setError(
-        "Ollama API key is not configured. Please configure it in Settings."
+        "Groq API key is not configured. Please configure it in Settings."
       );
 
       return;
@@ -97,26 +103,27 @@ export default function StepsPage() {
       setError("");
       setResult(null);
 
-      const response = await fetch(
-        "/api/generate-steps",
-        {
-          method: "POST",
+      const response =
+        await fetch(
+          "/api/generate-steps",
+          {
+            method: "POST",
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
 
-          body: JSON.stringify({
-            featureContent,
-            pomContent,
+            body: JSON.stringify({
+              featureContent,
+              pomContent,
 
-            apiKey,
-            generatorModel,
-            reviewerModel,
-          }),
-        }
-      );
+              apiKey,
+              generatorModel,
+              reviewerModel,
+            }),
+          }
+        );
 
       const data =
         await response.json();
@@ -141,7 +148,9 @@ export default function StepsPage() {
         err
       );
 
-      if (err instanceof Error) {
+      if (
+        err instanceof Error
+      ) {
         setError(
           err.message
         );
@@ -156,13 +165,16 @@ export default function StepsPage() {
     }
   };
 
+  // =====================================================
+  // UI
+  // =====================================================
+
   return (
     <main className="min-h-screen bg-gray-100 p-8">
+
       <div className="mx-auto max-w-7xl">
 
-        {/* =====================================================
-            HEADER
-        ===================================================== */}
+        {/* HEADER */}
 
         <div className="mb-8 rounded-2xl bg-white p-8 shadow">
 
@@ -193,17 +205,13 @@ export default function StepsPage() {
 
         </div>
 
-        {/* =====================================================
-            INPUTS
-        ===================================================== */}
+        {/* INPUTS */}
 
         <div className="rounded-2xl bg-white p-8 shadow">
 
           <div className="grid gap-8 md:grid-cols-2">
 
-            {/* =================================================
-                FEATURE FILE
-            ================================================= */}
+            {/* FEATURE FILE */}
 
             <div>
 
@@ -231,11 +239,15 @@ export default function StepsPage() {
                   accept=".feature,.txt"
                   className="hidden"
 
-                  onChange={async (event) => {
+                  onChange={async (
+                    event
+                  ) => {
                     const file =
                       event.target.files?.[0];
 
-                    if (!file) return;
+                    if (!file) {
+                      return;
+                    }
 
                     const content =
                       await file.text();
@@ -266,9 +278,7 @@ export default function StepsPage() {
 
             </div>
 
-            {/* =================================================
-                POM FILE
-            ================================================= */}
+            {/* POM FILE */}
 
             <div>
 
@@ -296,11 +306,15 @@ export default function StepsPage() {
                   accept=".ts,.txt"
                   className="hidden"
 
-                  onChange={async (event) => {
+                  onChange={async (
+                    event
+                  ) => {
                     const file =
                       event.target.files?.[0];
 
-                    if (!file) return;
+                    if (!file) {
+                      return;
+                    }
 
                     const content =
                       await file.text();
@@ -333,24 +347,24 @@ export default function StepsPage() {
 
           </div>
 
-          {/* =================================================
-              READY STATUS
-          ================================================= */}
+          {/* READY STATUS */}
 
-          {featureContent && pomContent && (
-            <div className="mt-6 rounded-lg bg-green-50 p-4 text-green-700">
-              ✓ Feature file and Page Object Model loaded successfully.
-            </div>
-          )}
+          {featureContent &&
+            pomContent && (
+              <div className="mt-6 rounded-lg bg-green-50 p-4 text-green-700">
+                ✓ Feature file and Page Object Model loaded successfully.
+              </div>
+            )}
 
-          {/* =================================================
-              GENERATE BUTTON
-          ================================================= */}
+          {/* GENERATE */}
 
           <button
-            onClick={generateSteps}
-            disabled={isGenerating}
-
+            onClick={
+              generateSteps
+            }
+            disabled={
+              isGenerating
+            }
             className="mt-8 w-full rounded-lg bg-blue-600 px-6 py-4 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
           >
             {isGenerating
@@ -368,9 +382,7 @@ export default function StepsPage() {
 
         </div>
 
-        {/* =====================================================
-            GENERATED RESULT
-        ===================================================== */}
+        {/* RESULT */}
 
         {result && (
           <div className="mt-8 rounded-2xl bg-white p-8 shadow">
@@ -397,9 +409,7 @@ export default function StepsPage() {
 
             </div>
 
-            {/* =================================================
-                FILE INFORMATION
-            ================================================= */}
+            {/* FILE INFORMATION */}
 
             <div className="mb-5 flex flex-wrap gap-3">
 
@@ -413,9 +423,7 @@ export default function StepsPage() {
 
             </div>
 
-            {/* =================================================
-                CODE
-            ================================================= */}
+            {/* CODE */}
 
             <div className="overflow-hidden rounded-xl bg-gray-950">
 
@@ -437,6 +445,7 @@ export default function StepsPage() {
         )}
 
       </div>
+
     </main>
   );
 }

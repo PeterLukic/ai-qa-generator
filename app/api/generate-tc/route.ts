@@ -10,16 +10,12 @@ type TestCaseFormat =
   | "bdd";
 
 // =====================================================
-// ALLOWED OLLAMA MODELS
+// ALLOWED GROQ MODELS
 // =====================================================
 
 const ALLOWED_MODELS = [
-  "gemma4:31b",
-  "gpt-oss:20b",
-  "gpt-oss:120b",
-  "nemotron-3-nano:30b",
-  "nemotron-3-super",
-  "nemotron-3-ultra",
+  "openai/gpt-oss-20b",
+  "openai/gpt-oss-120b",
 ] as const;
 
 // =====================================================
@@ -289,9 +285,12 @@ function getGeneratedCount(
   format: TestCaseFormat
 ): number {
   if (format === "bdd") {
-    const scenarios = data.scenarios;
+    const scenarios =
+      data.scenarios;
 
-    return Array.isArray(scenarios)
+    return Array.isArray(
+      scenarios
+    )
       ? scenarios.length
       : 0;
   }
@@ -299,7 +298,9 @@ function getGeneratedCount(
   const testCases =
     data.testCases;
 
-  return Array.isArray(testCases)
+  return Array.isArray(
+    testCases
+  )
     ? testCases.length
     : 0;
 }
@@ -314,61 +315,75 @@ function parseModelJson(
   let cleaned =
     content.trim();
 
-  // Sometimes models still return ```json ... ```
-  // even when instructed not to.
   cleaned = cleaned
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/, "")
+    .replace(
+      /^```json\s*/i,
+      ""
+    )
+    .replace(
+      /^```\s*/i,
+      ""
+    )
+    .replace(
+      /\s*```$/,
+      ""
+    )
     .trim();
 
-  return JSON.parse(cleaned);
+  return JSON.parse(
+    cleaned
+  );
 }
 
 // =====================================================
-// CALL OLLAMA CLOUD
+// CALL GROQ
 // =====================================================
 
-async function callOllama(
+async function callGroq(
   apiKey: string,
   model: string,
   prompt: string
 ): Promise<string> {
 
-  const response = await fetch(
-    "https://ollama.com/api/chat",
-    {
-      method: "POST",
+  const response =
+    await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
 
-      headers: {
-        Authorization:
-          `Bearer ${apiKey}`,
+        headers: {
+          Authorization:
+            `Bearer ${apiKey.trim()}`,
 
-        "Content-Type":
-          "application/json",
-      },
+          "Content-Type":
+            "application/json",
+        },
 
-      body: JSON.stringify({
-        model,
+        body: JSON.stringify({
+          model,
 
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
 
-        stream: false,
-      }),
-    }
-  );
+          temperature: 0.2,
+        }),
+      }
+    );
+
+  // =================================================
+  // GROQ ERROR
+  // =================================================
 
   if (!response.ok) {
     const errorText =
       await response.text();
 
     console.error(
-      `Ollama request failed for ${model}:`,
+      `Groq request failed for ${model}:`,
       response.status,
       errorText
     );
@@ -378,27 +393,48 @@ async function callOllama(
       response.status === 403
     ) {
       throw new Error(
-        "Invalid or unauthorized Ollama API key."
+        "Invalid or unauthorized Groq API key."
+      );
+    }
+
+    if (
+      response.status === 429
+    ) {
+      throw new Error(
+        "Groq rate limit reached. Please wait and try again."
+      );
+    }
+
+    if (
+      response.status === 413
+    ) {
+      throw new Error(
+        "The uploaded DOM is too large for the Groq request."
       );
     }
 
     throw new Error(
-      `Ollama model "${model}" failed with status ${response.status}.`
+      `Groq model "${model}" failed with status ${response.status}.`
     );
   }
+
+  // =================================================
+  // GROQ RESPONSE
+  // =================================================
 
   const data =
     await response.json();
 
   const content =
-    data?.message?.content;
+    data?.choices?.[0]
+      ?.message?.content;
 
   if (
     !content ||
     typeof content !== "string"
   ) {
     throw new Error(
-      `Ollama model "${model}" returned an empty response.`
+      `Groq model "${model}" returned an empty response.`
     );
   }
 
@@ -406,7 +442,7 @@ async function callOllama(
 }
 
 // =====================================================
-// POST /api/generate
+// POST /api/generate-tc
 // =====================================================
 
 export async function POST(
@@ -424,7 +460,8 @@ export async function POST(
     const {
       dom,
       numberOfTests = 10,
-      testCaseFormat = "detailed",
+      testCaseFormat =
+        "detailed",
 
       apiKey,
       generatorModel,
@@ -451,17 +488,18 @@ export async function POST(
     }
 
     // =================================================
-    // VALIDATE API KEY
+    // VALIDATE GROQ API KEY
     // =================================================
 
     if (
       !apiKey ||
-      typeof apiKey !== "string"
+      typeof apiKey !== "string" ||
+      !apiKey.trim()
     ) {
       return NextResponse.json(
         {
           error:
-            "Ollama API key is required. Configure it in Settings.",
+            "Groq API key is required. Configure it in Settings.",
         },
         {
           status: 400,
@@ -475,7 +513,8 @@ export async function POST(
 
     if (
       !generatorModel ||
-      typeof generatorModel !== "string"
+      typeof generatorModel !==
+        "string"
     ) {
       return NextResponse.json(
         {
@@ -510,7 +549,8 @@ export async function POST(
 
     if (
       !reviewerModel ||
-      typeof reviewerModel !== "string"
+      typeof reviewerModel !==
+        "string"
     ) {
       return NextResponse.json(
         {
@@ -574,7 +614,9 @@ export async function POST(
     // =================================================
 
     const requestedTests =
-      Number(numberOfTests);
+      Number(
+        numberOfTests
+      );
 
     if (
       !Number.isInteger(
@@ -609,12 +651,12 @@ export async function POST(
     );
 
     console.log(
-      "Generator model:",
+      "Groq Generator model:",
       generatorModel
     );
 
     console.log(
-      "Reviewer model:",
+      "Groq Reviewer model:",
       reviewerModel
     );
 
@@ -630,7 +672,7 @@ export async function POST(
     // =====================================================
 
     console.log(
-      "QA Generator is creating test cases..."
+      "QA Generator is creating test cases with Groq..."
     );
 
     const generationPrompt =
@@ -641,7 +683,7 @@ export async function POST(
       );
 
     const generatorContent =
-      await callOllama(
+      await callGroq(
         apiKey,
         generatorModel,
         generationPrompt
@@ -655,6 +697,7 @@ export async function POST(
         parseModelJson(
           generatorContent
         );
+
     } catch {
       console.error(
         "Generator returned invalid JSON."
@@ -694,7 +737,7 @@ export async function POST(
     // =====================================================
 
     console.log(
-      "QA Reviewer is reviewing generated tests..."
+      "QA Reviewer is reviewing generated tests with Groq..."
     );
 
     const seniorReviewRules =
@@ -802,7 +845,7 @@ ${JSON.stringify(
 `;
 
     const reviewerContent =
-      await callOllama(
+      await callGroq(
         apiKey,
         reviewerModel,
         reviewerPrompt
@@ -816,6 +859,7 @@ ${JSON.stringify(
         parseModelJson(
           reviewerContent
         );
+
     } catch {
       console.error(
         "Reviewer returned invalid JSON."
@@ -863,6 +907,9 @@ ${JSON.stringify(
         `${generatorModel} + ${reviewerModel}`,
 
       workflow: {
+        provider:
+          "groq",
+
         generatorModel,
         reviewerModel,
 
@@ -879,7 +926,7 @@ ${JSON.stringify(
   } catch (error) {
 
     console.error(
-      "Generate API error:",
+      "Generate TC API error:",
       error
     );
 
@@ -890,7 +937,8 @@ ${JSON.stringify(
 
     return NextResponse.json(
       {
-        error: message,
+        error:
+          message,
       },
       {
         status: 500,

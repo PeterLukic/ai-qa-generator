@@ -5,13 +5,13 @@ import {
   PomFramework,
 } from "@/lib/prompts/pomPrompt";
 
+// =====================================================
+// ALLOWED GROQ MODELS
+// =====================================================
+
 const ALLOWED_MODELS = [
-  "gemma4:31b",
-  "gpt-oss:20b",
-  "gpt-oss:120b",
-  "nemotron-3-nano:30b",
-  "nemotron-3-super",
-  "nemotron-3-ultra",
+  "openai/gpt-oss-20b",
+  "openai/gpt-oss-120b",
 ] as const;
 
 function isAllowedModel(model: string): boolean {
@@ -35,21 +35,21 @@ function cleanCode(content: string): string {
 }
 
 // =====================================================
-// CALL OLLAMA CLOUD
+// CALL GROQ
 // =====================================================
 
-async function callOllama(
+async function callGroq(
   apiKey: string,
   model: string,
   prompt: string
 ): Promise<string> {
   const response = await fetch(
-    "https://ollama.com/api/chat",
+    "https://api.groq.com/openai/v1/chat/completions",
     {
       method: "POST",
 
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey.trim()}`,
         "Content-Type": "application/json",
       },
 
@@ -63,7 +63,7 @@ async function callOllama(
           },
         ],
 
-        stream: false,
+        temperature: 0.2,
       }),
     }
   );
@@ -73,7 +73,7 @@ async function callOllama(
       await response.text();
 
     console.error(
-      `Ollama request failed for ${model}:`,
+      `Groq request failed for ${model}:`,
       response.status,
       errorText
     );
@@ -83,12 +83,24 @@ async function callOllama(
       response.status === 403
     ) {
       throw new Error(
-        "Invalid or unauthorized Ollama API key."
+        "Invalid or unauthorized Groq API key."
+      );
+    }
+
+    if (response.status === 429) {
+      throw new Error(
+        "Groq rate limit reached. Please wait and try again."
+      );
+    }
+
+    if (response.status === 413) {
+      throw new Error(
+        "The uploaded DOM is too large for the Groq request."
       );
     }
 
     throw new Error(
-      `Ollama model "${model}" failed with status ${response.status}.`
+      `Groq model "${model}" failed with status ${response.status}.`
     );
   }
 
@@ -96,14 +108,15 @@ async function callOllama(
     await response.json();
 
   const content =
-    data?.message?.content;
+    data?.choices?.[0]
+      ?.message?.content;
 
   if (
     !content ||
     typeof content !== "string"
   ) {
     throw new Error(
-      `Ollama model "${model}" returned an empty response.`
+      `Groq model "${model}" returned an empty response.`
     );
   }
 
@@ -129,7 +142,7 @@ export async function POST(request: Request) {
     } = body;
 
     // =================================================
-    // VALIDATION
+    // VALIDATE DOM
     // =================================================
 
     if (
@@ -138,13 +151,18 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         {
-          error: "DOM content is required.",
+          error:
+            "DOM content is required.",
         },
         {
           status: 400,
         }
       );
     }
+
+    // =================================================
+    // VALIDATE CLASS NAME
+    // =================================================
 
     if (
       !className ||
@@ -161,6 +179,10 @@ export async function POST(request: Request) {
       );
     }
 
+    // =================================================
+    // VALIDATE FRAMEWORK
+    // =================================================
+
     const allowedFrameworks:
       PomFramework[] = [
         "playwright",
@@ -168,7 +190,9 @@ export async function POST(request: Request) {
       ];
 
     if (
-      !allowedFrameworks.includes(framework)
+      !allowedFrameworks.includes(
+        framework
+      )
     ) {
       return NextResponse.json(
         {
@@ -181,20 +205,29 @@ export async function POST(request: Request) {
       );
     }
 
+    // =================================================
+    // VALIDATE GROQ API KEY
+    // =================================================
+
     if (
       !apiKey ||
-      typeof apiKey !== "string"
+      typeof apiKey !== "string" ||
+      !apiKey.trim()
     ) {
       return NextResponse.json(
         {
           error:
-            "Ollama API key is required. Configure it in Settings.",
+            "Groq API key is required. Configure it in Settings.",
         },
         {
           status: 400,
         }
       );
     }
+
+    // =================================================
+    // VALIDATE GENERATOR MODEL
+    // =================================================
 
     if (
       !generatorModel ||
@@ -211,6 +244,10 @@ export async function POST(request: Request) {
         }
       );
     }
+
+    // =================================================
+    // VALIDATE REVIEWER MODEL
+    // =================================================
 
     if (
       !reviewerModel ||
@@ -239,16 +276,21 @@ export async function POST(request: Request) {
     );
 
     console.log(
-      "Generator:",
+      "Groq Generator:",
       generatorModel
     );
 
     console.log(
-      "Reviewer:",
+      "Groq Reviewer:",
       reviewerModel
     );
 
-    // Never log API key.
+    console.log(
+      "DOM length:",
+      dom.length
+    );
+
+    // NEVER log API key.
 
     // =====================================================
     // 1. GENERATOR
@@ -262,14 +304,16 @@ export async function POST(request: Request) {
       );
 
     const generatedContent =
-      await callOllama(
+      await callGroq(
         apiKey,
         generatorModel,
         generationPrompt
       );
 
     const generatedCode =
-      cleanCode(generatedContent);
+      cleanCode(
+        generatedContent
+      );
 
     // =====================================================
     // 2. REVIEWER
@@ -280,22 +324,30 @@ You are an experienced Senior QA Automation Engineer.
 
 Review the generated Page Object Model below.
 
-Your job is to return the FINAL improved TypeScript Page Object Model.
+Your job is to return the FINAL improved TypeScript
+Page Object Model.
 
-FRAMEWORK:
+=====================================================
+FRAMEWORK
+=====================================================
 
 ${framework}
 
-CLASS NAME:
+=====================================================
+CLASS NAME
+=====================================================
 
 ${className}
 
-REVIEW RULES:
+=====================================================
+REVIEW RULES
+=====================================================
 
 1. Preserve the selected framework.
 
 2. Preserve the class name exactly:
-   ${className}
+
+${className}
 
 3. Fix invalid TypeScript.
 
@@ -309,7 +361,8 @@ REVIEW RULES:
 
 8. Prefer meaningful user-facing locators.
 
-9. Do not invent selectors that are not supported by the DOM.
+9. Do not invent selectors that are not supported
+   by the supplied DOM.
 
 10. Do not invent functionality.
 
@@ -319,38 +372,88 @@ REVIEW RULES:
 
 13. Keep methods reusable and user-focused.
 
-14. Do not place test assertions in the Page Object.
+14. Action methods must reuse locators already declared
+    in the Page Object.
 
-15. Do not generate tests.
+15. Do not recreate selectors inside methods.
 
-16. Do not generate BDD.
+16. Important reusable locators MUST remain public readonly.
 
-17. Do not generate step definitions.
+GOOD:
 
-18. Return ONLY TypeScript source code.
+readonly usernameInput: Locator;
 
-19. Do not return Markdown.
+BAD:
 
-20. Do not use triple backticks.
+private readonly usernameInput: Locator;
 
-ORIGINAL DOM:
+BAD:
+
+protected readonly usernameInput: Locator;
+
+17. Public locators may later be used by Step Definitions
+    for Playwright assertions.
+
+18. Do not introduce private or protected locators.
+
+19. Do not use #private TypeScript fields.
+
+20. Do not put test assertions inside the Page Object.
+
+21. Do not generate tests.
+
+22. Do not generate BDD scenarios.
+
+23. Do not generate Step Definitions.
+
+24. Do not invent URLs.
+
+25. Return ONLY TypeScript source code.
+
+26. Do not return Markdown.
+
+27. Do not use triple backticks.
+
+=====================================================
+FINAL CHECK
+=====================================================
+
+Before returning the code verify:
+
+- class name is exactly ${className}
+- framework is ${framework}
+- important locators are public readonly
+- selectors are supported by the DOM
+- no duplicate locators exist
+- methods reuse declared locators
+- no unnecessary assertions exist
+- no test code exists
+- TypeScript is valid
+
+=====================================================
+ORIGINAL DOM
+=====================================================
 
 ${dom}
 
-GENERATED PAGE OBJECT:
+=====================================================
+GENERATED PAGE OBJECT
+=====================================================
 
 ${generatedCode}
 `;
 
     const reviewedContent =
-      await callOllama(
+      await callGroq(
         apiKey,
         reviewerModel,
         reviewerPrompt
       );
 
     const finalCode =
-      cleanCode(reviewedContent);
+      cleanCode(
+        reviewedContent
+      );
 
     // =====================================================
     // FINAL RESPONSE
@@ -367,12 +470,17 @@ ${generatedCode}
         `${generatorModel} + ${reviewerModel}`,
 
       workflow: {
+        provider:
+          "groq",
+
         generatorModel,
         reviewerModel,
       },
 
-      code: finalCode,
+      code:
+        finalCode,
     });
+
   } catch (error) {
     console.error(
       "Generate POM API error:",
@@ -386,7 +494,8 @@ ${generatedCode}
 
     return NextResponse.json(
       {
-        error: message,
+        error:
+          message,
       },
       {
         status: 500,
