@@ -1,31 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
 
-const OLLAMA_MODELS = [
+const GROQ_MODELS = [
   {
-    value: "gemma4:31b",
-    label: "Gemma 4 31B",
+    value:
+      "openai/gpt-oss-20b",
+    label:
+      "GPT-OSS 20B",
   },
   {
-    value: "gpt-oss:20b",
-    label: "GPT-OSS 20B",
-  },
-  {
-    value: "gpt-oss:120b",
-    label: "GPT-OSS 120B",
-  },
-  {
-    value: "nemotron-3-nano:30b",
-    label: "Nemotron 3 Nano 30B",
-  },
-  {
-    value: "nemotron-3-super",
-    label: "Nemotron 3 Super",
-  },
-  {
-    value: "nemotron-3-ultra",
-    label: "Nemotron 3 Ultra",
+    value:
+      "openai/gpt-oss-120b",
+    label:
+      "GPT-OSS 120B",
   },
 ];
 
@@ -35,56 +26,121 @@ type ConnectionResult = {
 };
 
 export default function SettingsPage() {
-  const [apiKey, setApiKey] = useState("");
+  const [
+    apiKey,
+    setApiKey,
+  ] = useState("");
 
-  const [generatorModel, setGeneratorModel] =
-    useState("gpt-oss:20b");
+  const [
+    generatorModel,
+    setGeneratorModel,
+  ] = useState(
+    "openai/gpt-oss-20b"
+  );
 
-  const [reviewerModel, setReviewerModel] =
-    useState("gpt-oss:120b");
+  const [
+    reviewerModel,
+    setReviewerModel,
+  ] = useState(
+    "openai/gpt-oss-120b"
+  );
 
-  const [saved, setSaved] = useState(false);
+  const [
+    saved,
+    setSaved,
+  ] = useState(false);
 
-  const [isTesting, setIsTesting] =
-    useState(false);
+  const [
+    isTesting,
+    setIsTesting,
+  ] = useState(false);
 
-  const [connectionResult, setConnectionResult] =
-    useState<ConnectionResult | null>(null);
+  const [
+    connectionResult,
+    setConnectionResult,
+  ] =
+    useState<ConnectionResult | null>(
+      null
+    );
 
-  // =====================================================
+  // =========================================
   // LOAD SAVED SETTINGS
-  // =====================================================
+  // =========================================
 
   useEffect(() => {
     const storedApiKey =
-      sessionStorage.getItem("ollamaApiKey");
+      sessionStorage.getItem(
+        "groqApiKey"
+      );
 
     const storedGenerator =
-      localStorage.getItem("generatorModel");
+      localStorage.getItem(
+        "generatorModel"
+      );
 
     const storedReviewer =
-      localStorage.getItem("reviewerModel");
+      localStorage.getItem(
+        "reviewerModel"
+      );
+
+    const validModels =
+      GROQ_MODELS.map(
+        (model) => model.value
+      );
 
     if (storedApiKey) {
-      setApiKey(storedApiKey);
+      setApiKey(
+        storedApiKey
+      );
     }
 
-    if (storedGenerator) {
-      setGeneratorModel(storedGenerator);
+    // Old Ollama model values are ignored
+    if (
+      storedGenerator &&
+      validModels.includes(
+        storedGenerator
+      )
+    ) {
+      setGeneratorModel(
+        storedGenerator
+      );
+    } else {
+      localStorage.removeItem(
+        "generatorModel"
+      );
+
+      setGeneratorModel(
+        "openai/gpt-oss-20b"
+      );
     }
 
-    if (storedReviewer) {
-      setReviewerModel(storedReviewer);
+    if (
+      storedReviewer &&
+      validModels.includes(
+        storedReviewer
+      )
+    ) {
+      setReviewerModel(
+        storedReviewer
+      );
+    } else {
+      localStorage.removeItem(
+        "reviewerModel"
+      );
+
+      setReviewerModel(
+        "openai/gpt-oss-120b"
+      );
     }
   }, []);
 
-  // =====================================================
+  // =========================================
   // SAVE SETTINGS
-  // =====================================================
+  // =========================================
 
   const saveSettings = () => {
     sessionStorage.setItem(
-      "ollamaApiKey",
+      "groqApiKey",
       apiKey.trim()
     );
 
@@ -105,30 +161,35 @@ export default function SettingsPage() {
     }, 3000);
   };
 
-  // =====================================================
+  // =========================================
   // TEST ONE MODEL
-  // =====================================================
+  // =========================================
 
   const testModel = async (
     model: string
   ) => {
-    const response = await fetch(
-      "/api/test-ollama",
-      {
-        method: "POST",
+    const response =
+      await fetch(
+        "/api/test-groq",
+        {
+          method: "POST",
 
-        headers: {
-          "Content-Type": "application/json",
-        },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-        body: JSON.stringify({
-          apiKey: apiKey.trim(),
-          model,
-        }),
-      }
-    );
+          body: JSON.stringify({
+            apiKey:
+              apiKey.trim(),
 
-    const data = await response.json();
+            model,
+          }),
+        }
+      );
+
+    const data =
+      await response.json();
 
     if (!response.ok) {
       throw new Error(
@@ -140,223 +201,310 @@ export default function SettingsPage() {
     return data;
   };
 
-  // =====================================================
+  // =========================================
   // TEST CONNECTION
-  // =====================================================
+  // =========================================
 
-  const testConnection = async () => {
-    if (!apiKey.trim()) {
-      setConnectionResult({
-        success: false,
-        message:
-          "Please enter your Ollama API key first.",
-      });
-
-      return;
-    }
-
-    try {
-      setIsTesting(true);
-      setConnectionResult(null);
-
-      // Test generator model
-      await testModel(generatorModel);
-
-      // Test reviewer only if it is different
-      if (reviewerModel !== generatorModel) {
-        await testModel(reviewerModel);
-      }
-
-      setConnectionResult({
-        success: true,
-        message:
-          "Connection successful. Generator and Reviewer models are available.",
-      });
-    } catch (error) {
-      if (error instanceof Error) {
+  const testConnection =
+    async () => {
+      if (!apiKey.trim()) {
         setConnectionResult({
           success: false,
-          message: error.message,
-        });
-      } else {
-        setConnectionResult({
-          success: false,
+
           message:
-            "Unable to connect to Ollama Cloud.",
+            "Please enter your Groq API key first.",
         });
+
+        return;
       }
-    } finally {
-      setIsTesting(false);
-    }
-  };
+
+      try {
+        setIsTesting(true);
+
+        setConnectionResult(
+          null
+        );
+
+        // Test Generator
+        await testModel(
+          generatorModel
+        );
+
+        // Test Reviewer only if different
+        if (
+          reviewerModel !==
+          generatorModel
+        ) {
+          await testModel(
+            reviewerModel
+          );
+        }
+
+        setConnectionResult({
+          success: true,
+
+          message:
+            "Groq connection successful. Generator and Reviewer models are available.",
+        });
+
+      } catch (error) {
+        if (
+          error instanceof Error
+        ) {
+          setConnectionResult({
+            success: false,
+            message:
+              error.message,
+          });
+        } else {
+          setConnectionResult({
+            success: false,
+
+            message:
+              "Unable to connect to Groq.",
+          });
+        }
+
+      } finally {
+        setIsTesting(false);
+      }
+    };
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
+
       <div className="mx-auto max-w-4xl">
 
-        {/* HEADER */}
+        {/* =========================================
+            HEADER
+        ========================================= */}
 
         <div className="mb-8">
+
           <h1 className="text-4xl font-bold text-gray-900">
             Settings
           </h1>
 
           <p className="mt-2 text-gray-600">
-            Configure your Ollama API connection and
-            AI models used by the QA generators.
+            Configure your Groq API connection
+            and AI models used by AI QA Studio.
           </p>
+
         </div>
 
-        {/* SETTINGS CARD */}
+        {/* =========================================
+            SETTINGS CARD
+        ========================================= */}
 
         <div className="rounded-2xl bg-white p-8 shadow">
 
-          {/* =====================================================
+          {/* =========================================
               API KEY
-          ===================================================== */}
+          ========================================= */}
 
           <div>
+
             <label className="block text-lg font-semibold text-gray-900">
-              Ollama API Key
+              Groq API Key
             </label>
 
             <p className="mt-1 text-sm text-gray-500">
-              Your API key is stored only for the
-              current browser session.
+              Your API key is stored only for
+              the current browser tab session.
             </p>
 
             <input
               type="password"
-              value={apiKey}
-              onChange={(event) => {
-                setApiKey(event.target.value);
-                setConnectionResult(null);
+              value={
+                apiKey
+              }
+              onChange={(
+                event
+              ) => {
+                setApiKey(
+                  event.target.value
+                );
+
+                setConnectionResult(
+                  null
+                );
               }}
-              placeholder="Enter your Ollama API key"
+              placeholder="Enter your Groq API key"
               autoComplete="off"
               className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-gray-900 outline-none focus:border-blue-500"
             />
+
           </div>
 
           <div className="my-8 border-t border-gray-200" />
 
-          {/* =====================================================
+          {/* =========================================
               GENERATOR MODEL
-          ===================================================== */}
+          ========================================= */}
 
           <div>
+
             <label className="block text-lg font-semibold text-gray-900">
               Generator Model
             </label>
 
             <p className="mt-1 text-sm text-gray-500">
               Creates the initial QA test suite,
-              Page Object Model, or step definitions.
+              Page Object Model, or Step Definitions.
             </p>
 
             <select
-              value={generatorModel}
-              onChange={(event) => {
+              value={
+                generatorModel
+              }
+              onChange={(
+                event
+              ) => {
                 setGeneratorModel(
                   event.target.value
                 );
 
-                setConnectionResult(null);
+                setConnectionResult(
+                  null
+                );
               }}
               className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-gray-900"
             >
-              {OLLAMA_MODELS.map((model) => (
-                <option
-                  key={model.value}
-                  value={model.value}
-                >
-                  {model.label}
-                </option>
-              ))}
+              {GROQ_MODELS.map(
+                (model) => (
+                  <option
+                    key={
+                      model.value
+                    }
+                    value={
+                      model.value
+                    }
+                  >
+                    {model.label}
+                  </option>
+                )
+              )}
             </select>
+
           </div>
 
           <div className="my-8 border-t border-gray-200" />
 
-          {/* =====================================================
+          {/* =========================================
               REVIEWER MODEL
-          ===================================================== */}
+          ========================================= */}
 
           <div>
+
             <label className="block text-lg font-semibold text-gray-900">
               Reviewer Model
             </label>
 
             <p className="mt-1 text-sm text-gray-500">
-              Reviews the generated output, removes
-              weak results, and improves QA quality.
+              Reviews generated output
+              and improves QA quality.
             </p>
 
             <select
-              value={reviewerModel}
-              onChange={(event) => {
+              value={
+                reviewerModel
+              }
+              onChange={(
+                event
+              ) => {
                 setReviewerModel(
                   event.target.value
                 );
 
-                setConnectionResult(null);
+                setConnectionResult(
+                  null
+                );
               }}
               className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-gray-900"
             >
-              {OLLAMA_MODELS.map((model) => (
-                <option
-                  key={model.value}
-                  value={model.value}
-                >
-                  {model.label}
-                </option>
-              ))}
+              {GROQ_MODELS.map(
+                (model) => (
+                  <option
+                    key={
+                      model.value
+                    }
+                    value={
+                      model.value
+                    }
+                  >
+                    {model.label}
+                  </option>
+                )
+              )}
             </select>
+
           </div>
 
-          {/* =====================================================
+          {/* =========================================
               CURRENT CONFIGURATION
-          ===================================================== */}
+          ========================================= */}
 
           <div className="mt-8 rounded-xl bg-gray-50 p-5">
+
             <h2 className="font-semibold text-gray-900">
               Current Configuration
             </h2>
 
             <div className="mt-3 space-y-2 text-sm text-gray-700">
+
               <p>
-                <strong>Generator:</strong>{" "}
+                <strong>
+                  Provider:
+                </strong>{" "}
+                Groq
+              </p>
+
+              <p>
+                <strong>
+                  Generator:
+                </strong>{" "}
                 {generatorModel}
               </p>
 
               <p>
-                <strong>Reviewer:</strong>{" "}
+                <strong>
+                  Reviewer:
+                </strong>{" "}
                 {reviewerModel}
               </p>
 
               <p>
-                <strong>API Key:</strong>{" "}
+                <strong>
+                  API Key:
+                </strong>{" "}
                 {apiKey
                   ? "Configured"
                   : "Not configured"}
               </p>
+
             </div>
+
           </div>
 
-          {/* =====================================================
+          {/* =========================================
               TEST CONNECTION
-          ===================================================== */}
+          ========================================= */}
 
           <button
-            onClick={testConnection}
+            onClick={
+              testConnection
+            }
             disabled={
-              !apiKey.trim() || isTesting
+              !apiKey.trim() ||
+              isTesting
             }
             className="mt-8 w-full rounded-lg border-2 border-blue-600 px-6 py-4 font-semibold text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
           >
+
             {isTesting
-              ? "Testing Ollama Connection..."
+              ? "Testing Groq Connection..."
               : "Test Connection"}
+
           </button>
 
           {/* CONNECTION RESULT */}
@@ -369,21 +517,29 @@ export default function SettingsPage() {
                   : "bg-red-50 text-red-700"
               }`}
             >
+
               {connectionResult.success
                 ? "✓ "
                 : "✗ "}
 
-              {connectionResult.message}
+              {
+                connectionResult.message
+              }
+
             </div>
           )}
 
-          {/* =====================================================
+          {/* =========================================
               SAVE SETTINGS
-          ===================================================== */}
+          ========================================= */}
 
           <button
-            onClick={saveSettings}
-            disabled={!apiKey.trim()}
+            onClick={
+              saveSettings
+            }
+            disabled={
+              !apiKey.trim()
+            }
             className="mt-4 w-full rounded-lg bg-blue-600 px-6 py-4 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
           >
             Save Settings
@@ -397,23 +553,28 @@ export default function SettingsPage() {
 
         </div>
 
-        {/* SECURITY NOTE */}
+        {/* =========================================
+            SECURITY
+        ========================================= */}
 
         <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
+
           <h3 className="font-semibold text-blue-900">
             API Key Security
           </h3>
 
           <p className="mt-2 text-sm text-blue-800">
-            Your Ollama API key is stored in
-            sessionStorage, so it is removed when the
-            browser session ends. Your selected AI models
-            are stored locally so they remain selected
-            for future sessions.
+            Your Groq API key is stored in
+            sessionStorage and is not saved in
+            the application database.
+            It remains available while you use
+            this browser tab.
           </p>
+
         </div>
 
       </div>
+
     </main>
   );
 }
