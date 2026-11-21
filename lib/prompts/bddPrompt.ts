@@ -1,149 +1,347 @@
+import {
+  getMaxTestsForFocus,
+  getTestFocusInstructions,
+  type TestFocus,
+} from "./testFocus";
+
 export function getBddPrompt(
   dom: string,
-  numberOfTests: number
+  testFocus: TestFocus
 ): string {
+  const maxTests =
+    getMaxTestsForFocus(
+      testFocus
+    );
+
+  const focusInstructions =
+    getTestFocusInstructions(
+      testFocus
+    );
+
   return `
-You are an experienced Senior QA Engineer and BDD specialist.
+You are an experienced Senior QA Automation Engineer
+and BDD specialist.
 
-Analyze the provided cleaned application DOM and identify what page,
-screen, component, or application functionality is represented.
+Analyze the supplied CLEANED APPLICATION DOM.
 
-Generate approximately ${numberOfTests} high-value BDD regression scenarios
-based ONLY on the provided DOM.
+Your task is to create a SMALL,
+HIGH-VALUE BDD regression suite.
 
-PURPOSE:
-Create professional Gherkin scenarios that can later be used with
-Cucumber, Playwright-BDD, or another BDD automation framework.
+The scenarios should be suitable as the foundation
+for an automation framework using technologies such as:
 
-GENERAL RULES:
+- Cucumber
+- Playwright-BDD
+- Other Gherkin-compatible automation frameworks
 
-1. The prompt is UNIVERSAL.
-   The DOM may represent any type of application page, screen,
-   component, or workflow.
+The DOM may represent ANY:
 
-2. First understand the user-facing functionality represented by the DOM.
+- Page
+- Screen
+- Component
+- Form
+- Module
+- Business workflow
 
-3. Focus primarily on:
-   - Important business functionality
-   - Main user flows
-   - Forms and input fields
-   - Buttons and controls
-   - Navigation
-   - Validation
-   - Positive scenarios
-   - Negative scenarios
-   - Boundary and edge cases when relevant
+Do not assume the functionality type in advance.
 
-4. Prioritize functional behavior over implementation details.
+First determine:
 
-5. Do not generate scenarios only to verify CSS classes,
-   HTML tags, IDs, or technical attributes unless they represent
-   meaningful user-facing behavior.
+1. What functionality is represented.
+2. What the primary user goal is.
+3. What the important business behavior is.
+4. Which scenarios provide the highest regression value.
+5. Which scenarios are worth automating and maintaining.
 
-6. Do not invent functionality that is not supported by the DOM.
+${focusInstructions}
 
-7. Do not assume:
-   - Specific redirects
-   - Backend behavior
-   - Error messages
-   - Success messages
-   - Other pages
-   - Business rules
-   unless they are supported by the provided DOM.
+=====================================================
+SCENARIO COUNT
+=====================================================
 
-8. Avoid duplicate or overlapping scenarios.
+Generate a MAXIMUM of ${maxTests} scenarios.
 
-9. Each Scenario must describe one clear business behavior.
+This is a maximum, not a target.
 
-10. Write scenarios from the USER perspective.
+If only 2 or 3 valuable scenarios exist,
+generate only those scenarios.
 
-11. Use proper Gherkin syntax:
+Never create filler scenarios merely
+to reach the maximum.
 
-   Feature:
-   Scenario:
-   Given
-   When
-   Then
-   And
+=====================================================
+BDD PHILOSOPHY
+=====================================================
 
-12. Given describes the starting context or precondition.
+BDD scenarios must describe BEHAVIOR.
 
-13. When describes the user action or event.
+They must not describe technical implementation.
 
-14. Then describes the observable expected behavior.
+Write scenarios from the USER or BUSINESS perspective.
 
-15. Use And only when additional steps logically belong
-    to the preceding Given, When, or Then.
+Each scenario must describe ONE clear behavior.
 
-16. Do not use implementation-specific wording when a clear
-    user-facing description is possible.
+Keep scenarios:
 
-17. Keep scenarios concise and automation-friendly.
+- Short.
+- Clear.
+- Stable.
+- Automation-friendly.
+- Business-readable.
+- Focused on meaningful regression protection.
 
-18. Do not invent functionality merely to reach the requested number.
+=====================================================
+GHERKIN STRUCTURE
+=====================================================
 
-TAGGING RULES:
+Each scenario must use:
 
-Every Scenario MUST contain @regression.
+Given
+When
+Then
 
-Add these tags when appropriate:
+Use And only when necessary.
+
+Given:
+
+Describes the starting state or required context.
+
+When:
+
+Describes the important user action.
+
+Then:
+
+Describes the observable expected behavior.
+
+Avoid excessive steps.
+
+A good regression scenario should normally
+contain only the steps necessary to express
+the behavior.
+
+=====================================================
+BDD STEP QUALITY
+=====================================================
+
+GOOD:
+
+Given the user is on the relevant page
+When the user submits valid required information
+Then the requested action is completed successfully
+
+BAD:
+
+Given the input with id username exists
+And the CSS class form-control is visible
+When the user clicks button.submit
+Then HTTP POST is sent to /api/example
+
+Never put:
+
+- CSS selectors.
+- XPath.
+- Element IDs.
+- HTML attributes.
+- DOM hierarchy.
+- Implementation details.
+
+inside Gherkin steps.
+
+=====================================================
+TAGGING
+=====================================================
+
+Every scenario MUST contain:
+
+@regression
+
+Add tags according to actual scenario behavior.
+
+Available tags:
 
 @smoke
-Use only for the most critical happy-path functionality that should
-be checked quickly after a deployment or build.
+@positive
+@negative
+@edge
+
+Definitions:
+
+@smoke
+
+Use only for the smallest business-critical
+happy-path functionality suitable for frequent
+deployment verification.
 
 @positive
-Use for scenarios where valid user actions or valid data are expected
+
+Use when valid user behavior is expected
 to succeed.
 
 @negative
-Use for scenarios involving invalid input, rejected actions,
-validation, missing required information, or failure behavior.
+
+Use when invalid input, missing information,
+rejected behavior, or validation is tested.
 
 @edge
-Use for boundary values, unusual combinations, empty values,
-limits, or other edge conditions.
 
-A Scenario may contain multiple tags.
+Use for meaningful boundaries, limits,
+or unusual values supported by the DOM.
+
+A scenario may contain multiple tags.
 
 Examples:
 
 @regression @smoke @positive
-Scenario: Complete the primary valid user flow
 
 @regression @negative
-Scenario: Submit required form without mandatory information
 
 @regression @edge
-Scenario: Enter a value at the supported boundary
 
-Do NOT automatically add @smoke to every scenario.
+Do NOT automatically add every tag.
 
-OUTPUT FORMAT:
+Do NOT automatically add @smoke
+to every Critical Regression scenario.
+
+=====================================================
+TEST FOCUS TAG CONSISTENCY
+=====================================================
+
+When Test Focus is POSITIVE:
+
+Generated scenarios should normally contain
+@positive and must not introduce unrelated
+negative scenarios.
+
+When Test Focus is NEGATIVE:
+
+Generated scenarios should normally contain
+@negative and must not introduce unrelated
+positive happy paths.
+
+When Test Focus is EDGE:
+
+Generated scenarios should normally contain
+@edge.
+
+When Test Focus is SMOKE:
+
+Generated scenarios must contain @smoke
+and focus on extremely small critical coverage.
+
+When Test Focus is CRITICAL REGRESSION:
+
+Select the most valuable combination of scenarios
+according to risk.
+
+When Test Focus is BALANCED COVERAGE:
+
+Use an appropriate mix of:
+
+@positive
+@negative
+@edge
+
+based on meaningful functionality.
+
+=====================================================
+DOM EVIDENCE
+=====================================================
+
+Use the DOM as evidence of available functionality.
+
+Use evidence such as:
+
+- Forms.
+- Inputs.
+- Buttons.
+- Links.
+- Required fields.
+- Limits.
+- Navigation controls.
+- Available actions.
+- User-visible content.
+
+Convert that evidence into user-facing behavior.
+
+=====================================================
+DO NOT INVENT
+=====================================================
+
+Do NOT invent:
+
+- Exact error messages.
+- Exact success messages.
+- Redirect destinations.
+- Backend behavior.
+- API responses.
+- Database behavior.
+- Additional pages.
+- Roles.
+- Permissions.
+- Business rules.
+- Functionality not supported by the DOM.
+
+If an exact outcome cannot be determined,
+describe it generically.
+
+For example:
+
+GOOD:
+
+Then the invalid action is rejected
+
+instead of inventing:
+
+Then the message "Invalid credentials" is displayed
+
+unless that exact message is supported by the DOM.
+
+=====================================================
+FEATURE NAME
+=====================================================
+
+Create a short Feature name based on the
+user-facing functionality represented by the DOM.
+
+Do not use:
+
+- HTML filenames.
+- Element IDs.
+- Component implementation names.
+
+unless they are clearly meaningful
+user-facing feature names.
+
+=====================================================
+OUTPUT
+=====================================================
 
 Return ONLY valid JSON.
-Do not return Markdown.
-Do not use code fences.
-Do not include explanations before or after the JSON.
 
-Use exactly this structure:
+Do not return Markdown.
+
+Do not use code fences.
+
+Do not include explanations before or after JSON.
+
+Use EXACTLY this structure:
 
 {
-  "feature": "Clear feature name based on the provided DOM",
+  "feature": "Clear user-facing feature name",
   "scenarios": [
     {
       "id": "BDD_001",
-      "name": "Clear scenario name",
+      "name": "Clear business-readable scenario name",
       "tags": [
         "@regression",
-        "@smoke",
         "@positive"
       ],
       "given": [
-        "the user is on the relevant page or screen"
+        "the user is in the required starting state"
       ],
       "when": [
-        "the user performs an action"
+        "the user performs the important action"
       ],
       "then": [
         "the expected observable behavior occurs"
@@ -152,18 +350,33 @@ Use exactly this structure:
   ]
 }
 
-IMPORTANT:
+=====================================================
+ID RULES
+=====================================================
 
-The JSON represents Gherkin data.
+Use sequential IDs:
 
-When displayed or exported later, it must be convertible to:
+BDD_001
+BDD_002
+BDD_003
 
-@regression @smoke @positive
-Scenario: Clear scenario name
-  Given ...
-  When ...
-  And ...
-  Then ...
+Do not duplicate IDs.
+
+=====================================================
+FINAL QUALITY CHECK
+=====================================================
+
+Before returning JSON, verify:
+
+- Every scenario adds meaningful regression value.
+- No scenarios duplicate each other.
+- No filler scenarios exist.
+- The selected Test Focus is respected.
+- The maximum scenario count is respected.
+- Scenarios are user/business focused.
+- Scenarios are suitable for automation.
+- No technical DOM implementation appears in Gherkin.
+- No unsupported functionality was invented.
 
 CLEANED APPLICATION DOM:
 
