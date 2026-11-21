@@ -1,18 +1,18 @@
 export type TestFocus =
-  | "critical"
-  | "smoke"
-  | "positive"
-  | "negative"
-  | "edge"
-  | "balanced";
+    | "critical"
+    | "smoke"
+    | "positive"
+    | "negative"
+    | "edge"
+    | "balanced";
 
 export const ALLOWED_TEST_FOCUS: TestFocus[] = [
-  "critical",
-  "smoke",
-  "positive",
-  "negative",
-  "edge",
-  "balanced",
+    "critical",
+    "smoke",
+    "positive",
+    "negative",
+    "edge",
+    "balanced",
 ];
 
 // =====================================================
@@ -20,20 +20,20 @@ export const ALLOWED_TEST_FOCUS: TestFocus[] = [
 // =====================================================
 
 export function getMaxTestsForFocus(
-  focus: TestFocus
+    focus: TestFocus
 ): number {
-  switch (focus) {
-    case "smoke":
-      return 3;
+    switch (focus) {
+        case "smoke":
+            return 3;
 
-    case "critical":
-    case "positive":
-    case "negative":
-    case "edge":
-    case "balanced":
-    default:
-      return 5;
-  }
+        case "critical":
+        case "positive":
+        case "negative":
+        case "edge":
+        case "balanced":
+        default:
+            return 5;
+    }
 }
 
 // =====================================================
@@ -41,16 +41,16 @@ export function getMaxTestsForFocus(
 // =====================================================
 
 export function getTestFocusInstructions(
-  focus: TestFocus
+    focus: TestFocus
 ): string {
-  switch (focus) {
+    switch (focus) {
 
-    // =================================================
-    // CRITICAL REGRESSION
-    // =================================================
+        // =================================================
+        // CRITICAL REGRESSION
+        // =================================================
 
-    case "critical":
-      return `
+        case "critical":
+            return `
 TEST FOCUS: CRITICAL REGRESSION
 
 GOAL:
@@ -161,12 +161,12 @@ Do not invent behavior that is not supported
 by the supplied DOM.
 `;
 
-    // =================================================
-    // SMOKE TESTS
-    // =================================================
+        // =================================================
+        // SMOKE TESTS
+        // =================================================
 
-    case "smoke":
-      return `
+        case "smoke":
+            return `
 TEST FOCUS: SMOKE TESTS
 
 GOAL:
@@ -206,12 +206,12 @@ Think:
 "What must work for us to consider this module basically alive?"
 `;
 
-    // =================================================
-    // POSITIVE TESTS
-    // =================================================
+        // =================================================
+        // POSITIVE TESTS
+        // =================================================
 
-    case "positive":
-      return `
+        case "positive":
+            return `
 TEST FOCUS: POSITIVE TESTS
 
 GOAL:
@@ -244,19 +244,19 @@ Prefer business-important successful behavior
 over minor UI interactions.
 `;
 
-    // =================================================
-    // NEGATIVE TESTS
-    // =================================================
+        // =================================================
+        // NEGATIVE TESTS
+        // =================================================
 
-    case "negative":
-      return `
+        case "negative":
+            return `
 TEST FOCUS: NEGATIVE TESTS
 
 GOAL:
 
 Generate only the most important failure,
 rejection, prevention, and validation scenarios
-supported by the DOM.
+that are supported by evidence in the supplied DOM.
 
 Generate a MAXIMUM of 5 tests.
 
@@ -264,12 +264,49 @@ Fewer tests are acceptable.
 
 Focus on:
 
-- Invalid input.
 - Missing required information.
+- Clearly invalid input when invalidity can be
+  reasonably determined from the DOM.
 - Rejected actions.
 - Important validation.
 - Prevention of invalid submission.
 - Prevention of incorrect user actions.
+
+IMPORTANT EVIDENCE RULE:
+
+Do NOT invent special negative cases merely because
+they are common QA techniques.
+
+Do NOT generate scenarios involving:
+
+- Whitespace-only input.
+- Special characters.
+- SQL injection.
+- XSS payloads.
+- Extremely long values.
+- Unsupported formats.
+- Case sensitivity.
+- Locked accounts.
+- Retry limits.
+- Session expiration.
+- Security restrictions.
+
+unless the supplied DOM contains evidence that makes
+that scenario relevant.
+
+For example, evidence may include:
+
+- maxlength
+- minlength
+- min
+- max
+- pattern
+- required
+- input type
+- explicit validation text
+- visible restrictions
+- supported formats
+- available limits
 
 Do NOT:
 
@@ -277,18 +314,30 @@ Do NOT:
 - Repeat equivalent validation scenarios.
 - Invent specific error messages.
 - Invent backend behavior.
+- Invent navigation behavior after rejection.
 - Generate ordinary positive happy paths.
 - Generate cosmetic tests.
 
-Choose negative scenarios according to regression risk.
+If the DOM shows that a field is required,
+missing-field coverage is valid.
+
+If the DOM does NOT show how the application behaves
+after rejection, use a generic expected outcome such as:
+
+"The action is rejected."
+
+Do not invent what page the user remains on,
+what message appears, or what backend action occurs.
+
+Choose negative scenarios according to regression risk
+and available DOM evidence.
 `;
+        // =================================================
+        // EDGE CASES
+        // =================================================
 
-    // =================================================
-    // EDGE CASES
-    // =================================================
-
-    case "edge":
-      return `
+        case "edge":
+            return `
 TEST FOCUS: EDGE CASES
 
 GOAL:
@@ -330,12 +379,12 @@ Do NOT create generic edge cases simply to reach
 the maximum number of tests.
 `;
 
-    // =================================================
-    // BALANCED COVERAGE
-    // =================================================
+        // =================================================
+        // BALANCED COVERAGE
+        // =================================================
 
-    case "balanced":
-      return `
+        case "balanced":
+            return `
 TEST FOCUS: BALANCED COVERAGE
 
 GOAL:
@@ -370,7 +419,7 @@ a category count.
 Do NOT include cosmetic or low-value technical checks.
 `;
 
-    default:
-      return "";
-  }
+        default:
+            return "";
+    }
 }
