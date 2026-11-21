@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 
-import { getSimplePrompt } from "@/lib/prompts/simplePrompt";
 import { getDetailedPrompt } from "@/lib/prompts/detailedPrompt";
 import { getBddPrompt } from "@/lib/prompts/bddPrompt";
 
+import {
+  ALLOWED_TEST_FOCUS,
+  getMaxTestsForFocus,
+  getTestFocusInstructions,
+  type TestFocus,
+} from "@/lib/prompts/testFocus";
+
 type TestCaseFormat =
-  | "simple"
   | "detailed"
   | "bdd";
 
@@ -37,31 +42,25 @@ function isAllowedModel(
 function getGenerationPrompt(
   format: TestCaseFormat,
   dom: string,
-  numberOfTests: number
+  testFocus: TestFocus
 ): string {
   switch (format) {
-    case "simple":
-      return getSimplePrompt(
-        dom,
-        numberOfTests
-      );
-
     case "detailed":
       return getDetailedPrompt(
         dom,
-        numberOfTests
+        testFocus
       );
 
     case "bdd":
       return getBddPrompt(
         dom,
-        numberOfTests
+        testFocus
       );
 
     default:
       return getDetailedPrompt(
         dom,
-        numberOfTests
+        testFocus
       );
   }
 }
@@ -76,119 +75,70 @@ function getSeniorReviewRules(
   switch (format) {
 
     // =================================================
-    // SIMPLE
-    // =================================================
-
-    case "simple":
-      return `
-The selected output format is SIMPLE TEST CASES.
-
-PURPOSE:
-
-Create a high-level regression checklist describing WHAT
-should be tested.
-
-The final JSON MUST contain exactly this structure:
-
-{
-  "testCases": [
-    {
-      "id": "TC_001",
-      "name": "Clear test case name",
-      "description": "Clear description of what should be verified."
-    }
-  ]
-}
-
-IMPORTANT SIMPLE TEST RULES:
-
-- Focus on user-facing functionality.
-- Focus on important regression coverage.
-- Do not include detailed test steps.
-- Do not include expected results.
-- Do not include preconditions.
-- Do not include priorities.
-- Do not include automation code.
-
-Do NOT generate tests primarily about:
-
-- HTML attributes
-- element IDs
-- CSS classes
-- form action paths
-- HTTP methods
-- raw URLs
-- DOM hierarchy
-- selectors
-- framework implementation details
-
-Convert technical DOM evidence into meaningful
-user-facing regression objectives.
-`;
-
-    // =================================================
-    // DETAILED
+    // TABLE TEST CASES
     // =================================================
 
     case "detailed":
       return `
-The selected output format is DETAILED TEST CASES.
+The selected output format is TABLE TEST CASES.
 
 PURPOSE:
 
-Create professional manual regression test cases that
-can later be exported to Excel.
+Create a concise professional regression suite
+that can be displayed as a table and later
+exported to Excel.
 
-The final JSON MUST preserve exactly this structure:
+The final JSON MUST preserve EXACTLY this structure:
 
 {
   "testCases": [
     {
       "id": "TC_001",
-      "name": "Test case name",
-      "description": "Description",
-      "preconditions": [
-        "Required precondition"
+      "title": "Clear regression test title",
+      "priority": "P1",
+      "testSteps": [
+        "First tester action",
+        "Second tester action"
       ],
-      "steps": [
-        {
-          "step": 1,
-          "action": "Tester action",
-          "expectedResult": "Expected result for this action"
-        }
-      ],
-      "inputData": [
-        "Relevant test data"
-      ],
-      "priority": "High",
-      "actualResult": "",
-      "testEnvironment": "",
-      "executionStatus": "Not Executed",
-      "bugSeverity": "",
-      "bugPriority": "",
-      "notes": ""
+      "expectedResult": "Main observable expected result",
+      "status": "Not Executed",
+      "bugId": ""
     }
   ]
 }
 
-IMPORTANT DETAILED TEST RULES:
+TABLE TEST CASE RULES:
 
-- Every test step must have its own expected result.
-- Steps must be executable by a manual tester.
-- Input data must be relevant to the scenario.
-- Priority must be:
-  Critical, High, Medium, or Low.
+- Each test must have ONE clear objective.
+- Keep test steps concise.
+- Test steps must describe tester/user actions.
+- Do not put expected results inside testSteps.
+- expectedResult describes the main observable
+  outcome of the test.
+- Use only P1, P2, or P3 priority.
+- status MUST always be "Not Executed".
+- bugId MUST always be "".
+- Never invent Pass, Fail, Blocked, or defects.
 
-Execution fields MUST NOT be invented.
+PRIORITY MEANING:
 
-Set:
+P1 = Core or business-critical regression coverage.
+P2 = Important regression coverage.
+P3 = Useful but lower-risk regression coverage.
 
-actualResult = ""
-testEnvironment = ""
-executionStatus = "Not Executed"
-bugSeverity = ""
-bugPriority = ""
-notes = ""
+Do NOT generate fields such as:
+
+- description
+- preconditions
+- inputData
+- actualResult
+- testEnvironment
+- executionStatus
+- bugSeverity
+- bugPriority
+- notes
+
+Those fields are no longer part of the Table Test Case format.
 `;
 
     // =================================================
@@ -201,17 +151,17 @@ The selected output format is BDD / GHERKIN.
 
 PURPOSE:
 
-Create user-focused behavioral scenarios using proper
-Given / When / Then structure.
+Create concise, business-readable,
+automation-friendly behavioral scenarios.
 
-The final JSON MUST preserve exactly this structure:
+The final JSON MUST preserve EXACTLY this structure:
 
 {
-  "feature": "Feature name",
+  "feature": "Clear user-facing feature name",
   "scenarios": [
     {
       "id": "BDD_001",
-      "name": "Scenario name",
+      "name": "Clear business-readable scenario name",
       "tags": [
         "@regression",
         "@positive"
@@ -220,7 +170,7 @@ The final JSON MUST preserve exactly this structure:
         "starting condition"
       ],
       "when": [
-        "user action"
+        "important user action"
       ],
       "then": [
         "observable expected behavior"
@@ -229,46 +179,19 @@ The final JSON MUST preserve exactly this structure:
   ]
 }
 
-TAG RULES:
+BDD RULES:
 
-Every scenario MUST contain:
-
-@regression
-
-Add when appropriate:
-
-@smoke
-@positive
-@negative
-@edge
-
-TAG DEFINITIONS:
-
-@smoke
-Critical happy-path functionality.
-
-@positive
-Successful behavior using valid data.
-
-@negative
-Invalid data, rejected behavior, missing information,
-or validation scenarios.
-
-@edge
-Boundary values, limits, unusual combinations,
-or edge conditions.
-
-A scenario may contain multiple tags.
-
-IMPORTANT BDD RULES:
-
-- Use real Given / When / Then behavior.
-- Write scenarios from the user's perspective.
-- Do not turn BDD into manual test steps.
-- Do not focus on HTML implementation details.
-- Avoid scenarios about CSS, IDs, form methods,
-  internal URLs, DOM structure, or technical selectors.
-- Prefer business behavior and user-visible functionality.
+- Every scenario MUST contain @regression.
+- Add @smoke only when appropriate.
+- Add @positive for successful valid behavior.
+- Add @negative for invalid/rejected behavior.
+- Add @edge for meaningful boundaries.
+- Use Given / When / Then correctly.
+- Use And only through additional array items.
+- Keep scenarios concise.
+- Write from the user/business perspective.
+- Do not write technical DOM implementation
+  inside Gherkin steps.
 `;
 
     default:
@@ -371,11 +294,14 @@ async function callGroq(
 
           temperature: 0.2,
 
-          reasoning_effort: "low",
+          reasoning_effort:
+            "low",
 
-          include_reasoning: false,
+          include_reasoning:
+            false,
 
-          max_completion_tokens: 8192,
+          max_completion_tokens:
+            8192,
         }),
       }
     );
@@ -465,9 +391,12 @@ export async function POST(
 
     const {
       dom,
-      numberOfTests = 10,
+
+      testFocus =
+        "critical",
+
       testCaseFormat =
-      "detailed",
+        "detailed",
 
       apiKey,
       generatorModel,
@@ -591,7 +520,6 @@ export async function POST(
 
     const allowedFormats:
       TestCaseFormat[] = [
-        "simple",
         "detailed",
         "bdd",
       ];
@@ -616,31 +544,39 @@ export async function POST(
       testCaseFormat as TestCaseFormat;
 
     // =================================================
-    // VALIDATE NUMBER OF TESTS
+    // VALIDATE TEST FOCUS
     // =================================================
 
-    const requestedTests =
-      Number(
-        numberOfTests
-      );
-
     if (
-      !Number.isInteger(
-        requestedTests
-      ) ||
-      requestedTests < 1 ||
-      requestedTests > 50
+      typeof testFocus !==
+      "string" ||
+      !ALLOWED_TEST_FOCUS.includes(
+        testFocus as TestFocus
+      )
     ) {
       return NextResponse.json(
         {
           error:
-            "Number of test cases must be between 1 and 50.",
+            "Invalid Test Focus.",
         },
         {
           status: 400,
         }
       );
     }
+
+    const focus =
+      testFocus as TestFocus;
+
+    const maxTests =
+      getMaxTestsForFocus(
+        focus
+      );
+
+    const focusInstructions =
+      getTestFocusInstructions(
+        focus
+      );
 
     // =================================================
     // LOG CONFIGURATION
@@ -652,8 +588,13 @@ export async function POST(
     );
 
     console.log(
-      "Requested tests:",
-      requestedTests
+      "Selected test focus:",
+      focus
+    );
+
+    console.log(
+      "Maximum tests:",
+      maxTests
     );
 
     console.log(
@@ -678,14 +619,14 @@ export async function POST(
     // =====================================================
 
     console.log(
-      "QA Generator is creating test cases with Groq..."
+      "QA Generator is creating regression coverage with Groq..."
     );
 
     const generationPrompt =
       getGenerationPrompt(
         format,
         dom,
-        requestedTests
+        focus
       );
 
     const generatorContent =
@@ -743,7 +684,7 @@ export async function POST(
     // =====================================================
 
     console.log(
-      "QA Reviewer is reviewing generated tests with Groq..."
+      "QA Reviewer is reviewing generated regression coverage with Groq..."
     );
 
     const seniorReviewRules =
@@ -752,82 +693,151 @@ export async function POST(
       );
 
     const reviewerPrompt = `
-You are an experienced Senior QA Engineer.
+You are an experienced Senior QA Engineer
+and QA Automation Strategist.
 
-You are reviewing a regression test suite generated by
-another AI QA Engineer.
+You are reviewing a regression suite generated
+by another AI QA Engineer.
 
 You have:
 
 1. The original cleaned application DOM.
 2. The generated QA suite.
-3. The required output format.
+3. The selected Test Focus.
+4. The required output format.
 
 Your responsibility is to produce the FINAL,
 high-quality regression suite.
 
-GENERAL REVIEW RULES:
+=====================================================
+SELECTED TEST FOCUS
+=====================================================
+
+${focusInstructions}
+
+=====================================================
+MAXIMUM SUITE SIZE
+=====================================================
+
+The FINAL suite may contain a MAXIMUM of:
+
+${maxTests}
+
+${format === "bdd"
+  ? "BDD scenarios"
+  : "Table Test Cases"}
+
+This is a maximum, NOT a target.
+
+If the generated suite contains unnecessary tests,
+REMOVE them.
+
+If only 2 or 3 tests provide meaningful regression
+protection, return only those tests.
+
+Never keep filler tests simply to reach the maximum.
+
+=====================================================
+GENERAL REVIEW RULES
+=====================================================
 
 1. Review every generated test case or scenario.
 
 2. Remove duplicate coverage.
 
-3. Remove low-value or meaningless tests.
+3. Remove low-value coverage.
 
-4. Remove tests focused primarily on insignificant
-   implementation details.
+4. Remove cosmetic checks.
 
-5. Improve unclear test names.
+5. Remove implementation-detail checks.
 
-6. Improve descriptions where applicable.
+6. Remove tests that provide little regression value.
 
-7. Improve steps where applicable.
+7. Improve unclear test/scenario names.
 
-8. Improve expected results where applicable.
+8. Improve steps when necessary.
 
-9. Correct priorities where applicable.
+9. Improve expected results when necessary.
 
-10. Remove unsupported assumptions.
+10. Correct priority or tags when necessary.
 
-11. Do not invent functionality that cannot reasonably
-    be determined from the provided DOM.
+11. Remove unsupported assumptions.
 
-12. Do not assume:
-    - backend responses
-    - redirects
-    - success messages
-    - error messages
-    - validation messages
-    - additional pages
-    - database behavior
-    - business rules
+12. Do not invent functionality that cannot reasonably
+    be determined from the supplied DOM.
 
-    unless supported by the provided DOM.
+13. Do not assume:
 
-13. Prefer user-facing and business-critical functionality.
+    - Backend responses.
+    - API responses.
+    - Database behavior.
+    - Redirect destinations.
+    - Exact success messages.
+    - Exact error messages.
+    - Additional pages.
+    - Roles.
+    - Permissions.
+    - Business rules.
 
-14. Include positive coverage where appropriate.
+    unless supported by the supplied DOM.
 
-15. Include negative coverage where appropriate.
+14. Prefer user-facing behavior.
 
-16. Include meaningful edge cases when supported
-    by the DOM.
+15. Prefer business-critical functionality.
 
-17. Keep the final suite concise and useful.
+16. Prefer scenarios worth automating and
+    maintaining long-term.
 
-18. Preserve the required JSON structure exactly.
+17. Keep the final suite concise.
 
-19. Target approximately ${requestedTests}
-    final tests or scenarios.
+18. Preserve the required JSON structure EXACTLY.
 
-20. Never invent filler tests merely to reach
-    the requested number.
+19. Respect the selected Test Focus.
 
-21. The DOM is evidence of available functionality.
-    Convert technical DOM information into meaningful
-    user-focused QA coverage.
+20. Respect the maximum suite size.
+
+21. Never invent filler coverage.
+
+=====================================================
+AUTOMATION VALUE
+=====================================================
+
+Think like a QA Automation Engineer building
+the foundation of a regression framework.
+
+Ask:
+
+"Would this test be valuable enough to automate
+and maintain?"
+
+If the answer is no, remove it.
+
+The purpose is NOT maximum test quantity.
+
+The purpose is maximum regression value
+with minimum unnecessary maintenance.
+
+=====================================================
+DOM EVIDENCE
+=====================================================
+
+The DOM is evidence of available functionality.
+
+Convert technical DOM evidence into meaningful
+user-facing QA coverage.
+
+Do not expose technical implementation details
+unless they directly affect user functionality.
+
+=====================================================
+FORMAT RULES
+=====================================================
 
 ${seniorReviewRules}
+
+=====================================================
+FINAL RESPONSE
+=====================================================
 
 Return ONLY valid JSON.
 
@@ -835,7 +845,7 @@ Do not return Markdown.
 
 Do not use code fences.
 
-Do not include explanations before or after the JSON.
+Do not include explanations before or after JSON.
 
 ORIGINAL CLEANED APPLICATION DOM:
 
@@ -901,6 +911,51 @@ ${JSON.stringify(
     );
 
     // =====================================================
+    // FINAL SAFETY CHECK - MAX TEST COUNT
+    // =====================================================
+
+    if (
+      reviewerCount >
+      maxTests
+    ) {
+      console.warn(
+        `Reviewer returned ${reviewerCount} tests but maximum for "${focus}" is ${maxTests}.`
+      );
+
+      if (
+        format === "bdd" &&
+        Array.isArray(
+          reviewerData.scenarios
+        )
+      ) {
+        reviewerData.scenarios =
+          reviewerData.scenarios.slice(
+            0,
+            maxTests
+          );
+      }
+
+      if (
+        format === "detailed" &&
+        Array.isArray(
+          reviewerData.testCases
+        )
+      ) {
+        reviewerData.testCases =
+          reviewerData.testCases.slice(
+            0,
+            maxTests
+          );
+      }
+    }
+
+    const finalCount =
+      getGeneratedCount(
+        reviewerData,
+        format
+      );
+
+    // =====================================================
     // FINAL RESPONSE
     // =====================================================
 
@@ -909,12 +964,21 @@ ${JSON.stringify(
 
       format,
 
+      testFocus:
+        focus,
+
       model:
         `${generatorModel} + ${reviewerModel}`,
 
       workflow: {
         provider:
           "groq",
+
+        testFocus:
+          focus,
+
+        maximumTests:
+          maxTests,
 
         generatorModel,
         reviewerModel,
@@ -923,7 +987,7 @@ ${JSON.stringify(
           generatorCount,
 
         approved:
-          reviewerCount,
+          finalCount,
       },
 
       ...reviewerData,
