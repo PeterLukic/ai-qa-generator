@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { cleanDom } from "@/lib/domCleaner";
-import { chunkDom } from "@/lib/domChunker";
+import {
+    chunkDom,
+    type DomChunk,
+} from "@/lib/domChunker";
 
 type TestCaseFormat =
     | "detailed"
@@ -55,6 +58,20 @@ type GeneratedResult = {
 
     scenarios?:
     BddScenario[];
+
+    workflow?: {
+        provider?: string;
+        processingMode?: "direct" | "chunked";
+        originalDomLength?: number;
+        chunkCount?: number;
+        analyzedChunks?: number;
+        sourceContextLength?: number;
+        maximumTests?: number;
+        generated?: number;
+        approved?: number;
+        generatorModel?: string;
+        reviewerModel?: string;
+    };
 };
 
 export default function Home() {
@@ -67,6 +84,14 @@ export default function Home() {
         fileContent,
         setFileContent,
     ] = useState("");
+
+    const [
+        domChunks,
+        setDomChunks,
+    ] =
+        useState<DomChunk[]>(
+            []
+        );
 
     const [
         testFocus,
@@ -183,6 +208,9 @@ export default function Home() {
                                     dom:
                                         fileContent,
 
+                                    chunks:
+                                        domChunks,
+
                                     testFocus,
 
                                     testCaseFormat,
@@ -209,6 +237,24 @@ export default function Home() {
                 console.log(
                     "Backend response:",
                     data
+                );
+
+                console.log(
+                    "Processing mode:",
+                    data.workflow
+                        ?.processingMode
+                );
+
+                console.log(
+                    "Analyzed chunks:",
+                    data.workflow
+                        ?.analyzedChunks
+                );
+
+                console.log(
+                    "Source context length:",
+                    data.workflow
+                        ?.sourceContextLength
                 );
 
                 setResult(
@@ -246,8 +292,8 @@ export default function Home() {
             <div className="mx-auto max-w-7xl">
 
                 {/* =====================================================
-            HERO
-        ===================================================== */}
+                    HERO
+                ===================================================== */}
 
                 <div className="mb-8 rounded-2xl bg-white p-8 shadow">
 
@@ -276,8 +322,8 @@ export default function Home() {
                 </div>
 
                 {/* =====================================================
-            GENERATOR
-        ===================================================== */}
+                    GENERATOR
+                ===================================================== */}
 
                 <div className="rounded-xl bg-white p-8 shadow">
 
@@ -322,10 +368,15 @@ export default function Home() {
                                     cleanDom(
                                         content
                                     );
+
                                 const chunks =
                                     chunkDom(
                                         cleanedContent
                                     );
+
+                                setDomChunks(
+                                    chunks
+                                );
 
                                 console.log(
                                     "Semantic DOM chunks:",
@@ -373,8 +424,8 @@ export default function Home() {
                     </label>
 
                     {/* =================================================
-              SELECTED FILE
-          ================================================= */}
+                        SELECTED FILE
+                    ================================================= */}
 
                     {fileName && (
                         <div className="mt-4 rounded-lg bg-blue-50 p-4 text-blue-700">
@@ -389,20 +440,27 @@ export default function Home() {
                     )}
 
                     {/* =================================================
-              CLEANED DOM
-          ================================================= */}
+                        CLEANED DOM
+                    ================================================= */}
 
                     {fileContent && (
                         <div className="mt-4 rounded-lg bg-green-50 p-4 text-green-700">
 
                             ✓ DOM successfully loaded and cleaned.
 
+                            <div className="mt-1 text-sm text-green-600">
+                                Semantic chunks prepared:{" "}
+                                <strong>
+                                    {domChunks.length}
+                                </strong>
+                            </div>
+
                         </div>
                     )}
 
                     {/* =====================================================
-              SETTINGS
-          ===================================================== */}
+                        SETTINGS
+                    ===================================================== */}
 
                     <div className="mt-8 grid gap-6 md:grid-cols-2">
 
@@ -521,8 +579,8 @@ export default function Home() {
                     </div>
 
                     {/* =====================================================
-              GENERATE BUTTON
-          ===================================================== */}
+                        GENERATE BUTTON
+                    ===================================================== */}
 
                     <button
                         onClick={
@@ -555,8 +613,8 @@ export default function Home() {
                 </div>
 
                 {/* =====================================================
-            RESULTS
-        ===================================================== */}
+                    RESULTS
+                ===================================================== */}
 
                 {result && (
                     <div className="mt-8 rounded-xl bg-white p-8 shadow">
@@ -579,11 +637,38 @@ export default function Home() {
                                 </div>
                             )}
 
+                            {result.workflow?.processingMode && (
+                                <div className="mt-4 flex flex-wrap gap-2">
+
+                                    <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
+                                        Processing:{" "}
+                                        {
+                                            result.workflow
+                                                .processingMode
+                                        }
+                                    </span>
+
+                                    {result.workflow.processingMode ===
+                                        "chunked" && (
+                                            <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
+
+                                                Analyzed chunks:{" "}
+                                                {
+                                                    result.workflow
+                                                        .analyzedChunks
+                                                }
+
+                                            </span>
+                                        )}
+
+                                </div>
+                            )}
+
                         </div>
 
                         {/* =====================================================
-                TABLE TEST CASES
-            ===================================================== */}
+                            TABLE TEST CASES
+                        ===================================================== */}
 
                         {result.format ===
                             "detailed" &&
@@ -736,8 +821,8 @@ export default function Home() {
                             )}
 
                         {/* =====================================================
-                BDD / GHERKIN
-            ===================================================== */}
+                            BDD / GHERKIN
+                        ===================================================== */}
 
                         {result.format ===
                             "bdd" &&
