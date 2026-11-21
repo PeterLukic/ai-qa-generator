@@ -431,7 +431,7 @@ export default function Home() {
               >
 
                 <option value="critical">
-                  Critical Regression
+                  Critical Regression (Recommended)
                 </option>
 
                 <option value="positive">
