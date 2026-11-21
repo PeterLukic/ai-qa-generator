@@ -4,15 +4,16 @@ import { useState } from "react";
 import { cleanDom } from "@/lib/domCleaner";
 
 type TestCaseFormat =
-  | "simple"
   | "detailed"
   | "bdd";
 
-type SimpleTestCase = {
-  id: string;
-  name: string;
-  description: string;
-};
+type TestFocus =
+  | "critical"
+  | "positive"
+  | "negative"
+  | "edge"
+  | "smoke"
+  | "balanced";
 
 type DetailedStep = {
   step: number;
@@ -58,8 +59,7 @@ type GeneratedResult = {
   model?: string;
 
   testCases?:
-    | SimpleTestCase[]
-    | DetailedTestCase[];
+    DetailedTestCase[];
 
   feature?: string;
 
@@ -79,10 +79,12 @@ export default function Home() {
   ] = useState("");
 
   const [
-    numberOfTests,
-    setNumberOfTests,
+    testFocus,
+    setTestFocus,
   ] =
-    useState<number>(10);
+    useState<TestFocus>(
+      "critical"
+    );
 
   const [
     testCaseFormat,
@@ -159,6 +161,18 @@ export default function Home() {
         return;
       }
 
+      // =================================================
+      // TEMPORARY MAXIMUM TEST COUNT
+      //
+      // Backend still expects numberOfTests.
+      // Later the backend will use Test Focus directly.
+      // =================================================
+
+      const numberOfTests =
+        testFocus === "smoke"
+          ? 3
+          : 5;
+
       try {
         setIsGenerating(true);
 
@@ -187,6 +201,8 @@ export default function Home() {
                     fileContent,
 
                   numberOfTests,
+
+                  testFocus,
 
                   testCaseFormat,
 
@@ -256,19 +272,15 @@ export default function Home() {
           </h1>
 
           <p className="mt-3 max-w-3xl text-lg text-gray-600">
-            Generate important regression test cases
+            Generate focused regression test cases
             from your application DOM using AI-assisted
             QA review.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-2">
 
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-              Simple
-            </span>
-
             <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
-              Detailed
+              Table Test Cases
             </span>
 
             <span className="rounded-full bg-purple-50 px-3 py-1 text-sm font-medium text-purple-700">
@@ -383,58 +395,82 @@ export default function Home() {
 
           <div className="mt-8 grid gap-6 md:grid-cols-2">
 
-            {/* NUMBER OF TESTS */}
+            {/* =================================================
+                TEST FOCUS
+            ================================================= */}
 
             <div>
 
               <label className="block font-medium text-gray-700">
-                Number of test cases
+                Test Focus
               </label>
 
               <select
                 value={
-                  numberOfTests
+                  testFocus
                 }
 
                 onChange={(
                   event
-                ) =>
-                  setNumberOfTests(
-                    Number(
-                      event.target.value
-                    )
-                  )
-                }
+                ) => {
+                  setTestFocus(
+                    event.target
+                      .value as TestFocus
+                  );
+
+                  setResult(
+                    null
+                  );
+
+                  setError(
+                    ""
+                  );
+                }}
 
                 className="mt-2 w-full rounded-lg border border-gray-300 p-3 text-gray-900"
               >
 
-                <option value={10}>
-                  10
+                <option value="critical">
+                  Critical Regression
                 </option>
 
-                <option value={20}>
-                  20
+                <option value="positive">
+                  Positive Tests
                 </option>
 
-                <option value={30}>
-                  30
+                <option value="negative">
+                  Negative Tests
                 </option>
 
-                <option value={50}>
-                  50
+                <option value="edge">
+                  Edge Cases
+                </option>
+
+                <option value="smoke">
+                  Smoke Tests
+                </option>
+
+                <option value="balanced">
+                  Balanced Coverage
                 </option>
 
               </select>
 
+              <p className="mt-2 text-sm text-gray-500">
+                Select the type of regression coverage
+                you want the AI to prioritize.
+              </p>
+
             </div>
 
-            {/* TEST CASE FORMAT */}
+            {/* =================================================
+                TEST CASE FORMAT
+            ================================================= */}
 
             <div>
 
               <label className="block font-medium text-gray-700">
-                Test case format
+                Test Case Format
               </label>
 
               <select
@@ -444,22 +480,26 @@ export default function Home() {
 
                 onChange={(
                   event
-                ) =>
+                ) => {
                   setTestCaseFormat(
                     event.target
                       .value as TestCaseFormat
-                  )
-                }
+                  );
+
+                  setResult(
+                    null
+                  );
+
+                  setError(
+                    ""
+                  );
+                }}
 
                 className="mt-2 w-full rounded-lg border border-gray-300 p-3 text-gray-900"
               >
 
-                <option value="simple">
-                  Simple Test Cases
-                </option>
-
                 <option value="detailed">
-                  Detailed Test Cases
+                  Table Test Cases
                 </option>
 
                 <option value="bdd">
@@ -467,6 +507,11 @@ export default function Home() {
                 </option>
 
               </select>
+
+              <p className="mt-2 text-sm text-gray-500">
+                Choose between structured test cases
+                or automation-ready BDD scenarios.
+              </p>
 
             </div>
 
@@ -536,63 +581,10 @@ export default function Home() {
             </div>
 
             {/* =====================================================
-                SIMPLE TEST CASES
-            ===================================================== */}
+                TABLE TEST CASES
 
-            {result.format ===
-              "simple" &&
-              result.testCases && (
-
-                <div className="space-y-4">
-
-                  {(
-                    result.testCases as SimpleTestCase[]
-                  ).map(
-                    (
-                      testCase
-                    ) => (
-
-                      <div
-                        key={
-                          testCase.id
-                        }
-                        className="rounded-xl border border-gray-200 p-6"
-                      >
-
-                        <div className="text-sm font-bold text-blue-600">
-
-                          {
-                            testCase.id
-                          }
-
-                        </div>
-
-                        <h3 className="mt-1 text-xl font-bold text-gray-900">
-
-                          {
-                            testCase.name
-                          }
-
-                        </h3>
-
-                        <p className="mt-3 text-gray-700">
-
-                          {
-                            testCase.description
-                          }
-
-                        </p>
-
-                      </div>
-
-                    )
-                  )}
-
-                </div>
-              )}
-
-            {/* =====================================================
-                DETAILED TEST CASES
+                Internally this still uses format "detailed"
+                until the backend is updated.
             ===================================================== */}
 
             {result.format ===
@@ -601,9 +593,7 @@ export default function Home() {
 
                 <div className="space-y-6">
 
-                  {(
-                    result.testCases as DetailedTestCase[]
-                  ).map(
+                  {result.testCases.map(
                     (
                       testCase
                     ) => (
