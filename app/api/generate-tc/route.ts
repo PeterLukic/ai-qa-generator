@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getDetailedPrompt } from "@/lib/prompts/detailedPrompt";
 import { getBddPrompt } from "@/lib/prompts/bddPrompt";
+import { getChunkAnalysisPrompt } from "@/lib/prompts/chunkAnalysisPrompt";
 
 import {
   ALLOWED_TEST_FOCUS,
@@ -13,6 +14,41 @@ import {
 type TestCaseFormat =
   | "detailed"
   | "bdd";
+
+type DomChunkPayload = {
+  id: string;
+  documentIndex: number;
+  content: string;
+  length: number;
+};
+
+type ChunkAnalysis = {
+  chunkId?: string;
+  module?: string;
+  userGoals?: unknown[];
+  actions?: unknown[];
+  inputs?: unknown[];
+  navigation?: unknown[];
+  validationEvidence?: unknown[];
+  regressionRisks?: unknown[];
+  [key: string]: unknown;
+};
+
+// =====================================================
+// CONFIGURATION
+// =====================================================
+
+const LARGE_DOM_THRESHOLD =
+  24000;
+
+const MAX_CHUNKS =
+  30;
+
+const MAX_CHUNK_LENGTH =
+  16000;
+
+const CHUNK_ANALYSIS_MAX_TOKENS =
+  1800;
 
 // =====================================================
 // ALLOWED GROQ MODELS
@@ -31,7 +67,9 @@ function isAllowedModel(
   model: string
 ): boolean {
   return ALLOWED_MODELS.includes(
-    model as (typeof ALLOWED_MODELS)[number]
+    model as (
+      typeof ALLOWED_MODELS
+    )[number]
   );
 }
 
@@ -41,25 +79,25 @@ function isAllowedModel(
 
 function getGenerationPrompt(
   format: TestCaseFormat,
-  dom: string,
+  sourceContext: string,
   testFocus: TestFocus
 ): string {
   switch (format) {
     case "detailed":
       return getDetailedPrompt(
-        dom,
+        sourceContext,
         testFocus
       );
 
     case "bdd":
       return getBddPrompt(
-        dom,
+        sourceContext,
         testFocus
       );
 
     default:
       return getDetailedPrompt(
-        dom,
+        sourceContext,
         testFocus
       );
   }
@@ -138,11 +176,12 @@ Do NOT generate fields such as:
 - bugPriority
 - notes
 
-Those fields are no longer part of the Table Test Case format.
+Those fields are no longer part of the
+Table Test Case format.
 `;
 
     // =================================================
-    // BDD
+    // BDD / GHERKIN
     // =================================================
 
     case "bdd":
@@ -207,24 +246,20 @@ function getGeneratedCount(
   data: Record<string, unknown>,
   format: TestCaseFormat
 ): number {
-  if (format === "bdd") {
-    const scenarios =
-      data.scenarios;
-
+  if (
+    format === "bdd"
+  ) {
     return Array.isArray(
-      scenarios
+      data.scenarios
     )
-      ? scenarios.length
+      ? data.scenarios.length
       : 0;
   }
 
-  const testCases =
-    data.testCases;
-
   return Array.isArray(
-    testCases
+    data.testCases
   )
-    ? testCases.length
+    ? data.testCases.length
     : 0;
 }
 
@@ -259,13 +294,14 @@ function parseModelJson(
 }
 
 // =====================================================
-// CALL GROQ
+// GROQ
 // =====================================================
 
 async function callGroq(
   apiKey: string,
   model: string,
-  prompt: string
+  prompt: string,
+  maxCompletionTokens = 8192
 ): Promise<string> {
 
   const response =
@@ -301,14 +337,10 @@ async function callGroq(
             false,
 
           max_completion_tokens:
-            8192,
+            maxCompletionTokens,
         }),
       }
     );
-
-  // =================================================
-  // GROQ ERROR
-  // =================================================
 
   if (!response.ok) {
     const errorText =
@@ -333,7 +365,7 @@ async function callGroq(
       response.status === 429
     ) {
       throw new Error(
-        "Groq rate limit reached. Please wait and try again."
+        "Groq rate limit reached while processing the DOM. Please try again later."
       );
     }
 
@@ -341,7 +373,7 @@ async function callGroq(
       response.status === 413
     ) {
       throw new Error(
-        "The uploaded DOM is too large for the Groq request."
+        "A DOM chunk is still too large for the Groq request."
       );
     }
 
@@ -349,10 +381,6 @@ async function callGroq(
       `Groq model "${model}" failed with status ${response.status}.`
     );
   }
-
-  // =================================================
-  // GROQ RESPONSE
-  // =================================================
 
   const data =
     await response.json();
@@ -374,6 +402,229 @@ async function callGroq(
 }
 
 // =====================================================
+// VALIDATE CHUNKS
+// =====================================================
+
+function validateChunks(
+  chunks: unknown
+): DomChunkPayload[] {
+
+  if (
+    !Array.isArray(
+      chunks
+    )
+  ) {
+    throw new Error(
+      "Large DOM requires semantic DOM chunks."
+    );
+  }
+
+  if (
+    chunks.length === 0
+  ) {
+    throw new Error(
+      "No DOM chunks were provided."
+    );
+  }
+
+  if (
+    chunks.length >
+    MAX_CHUNKS
+  ) {
+    throw new Error(
+      `Too many DOM chunks. Maximum supported is ${MAX_CHUNKS}.`
+    );
+  }
+
+  const validated:
+    DomChunkPayload[] = [];
+
+  for (
+    const item of chunks
+  ) {
+    if (
+      !item ||
+      typeof item !==
+      "object"
+    ) {
+      throw new Error(
+        "Invalid DOM chunk."
+      );
+    }
+
+    const chunk =
+      item as Partial<DomChunkPayload>;
+
+    if (
+      !chunk.id ||
+      typeof chunk.id !==
+      "string"
+    ) {
+      throw new Error(
+        "DOM chunk ID is missing."
+      );
+    }
+
+    if (
+      !chunk.content ||
+      typeof chunk.content !==
+      "string"
+    ) {
+      throw new Error(
+        `DOM chunk ${chunk.id} has no content.`
+      );
+    }
+
+    if (
+      chunk.content.length >
+      MAX_CHUNK_LENGTH
+    ) {
+      throw new Error(
+        `DOM chunk ${chunk.id} is too large.`
+      );
+    }
+
+    validated.push({
+      id:
+        chunk.id,
+
+      documentIndex:
+        typeof chunk.documentIndex ===
+        "number"
+          ? chunk.documentIndex
+          : 1,
+
+      content:
+        chunk.content,
+
+      length:
+        chunk.content.length,
+    });
+  }
+
+  return validated;
+}
+
+// =====================================================
+// ANALYZE CHUNKS
+// =====================================================
+
+async function analyzeChunks(
+  chunks: DomChunkPayload[],
+  apiKey: string,
+  model: string
+): Promise<ChunkAnalysis[]> {
+
+  const analyses:
+    ChunkAnalysis[] = [];
+
+  for (
+    let index = 0;
+    index < chunks.length;
+    index++
+  ) {
+    const chunk =
+      chunks[index];
+
+    console.log(
+      `Analyzing DOM chunk ${index + 1}/${chunks.length}:`,
+      chunk.id,
+      `(${chunk.length} chars)`
+    );
+
+    const prompt =
+      getChunkAnalysisPrompt(
+        chunk.content,
+        chunk.id
+      );
+
+    const response =
+      await callGroq(
+        apiKey,
+        model,
+        prompt,
+        CHUNK_ANALYSIS_MAX_TOKENS
+      );
+
+    let parsed:
+      Record<string, unknown>;
+
+    try {
+      parsed =
+        parseModelJson(
+          response
+        );
+
+    } catch {
+      console.error(
+        `Chunk ${chunk.id} returned invalid JSON.`
+      );
+
+      console.error(
+        response
+      );
+
+      throw new Error(
+        `AI analysis failed for DOM chunk ${chunk.id}.`
+      );
+    }
+
+    analyses.push(
+      parsed as ChunkAnalysis
+    );
+  }
+
+  return analyses;
+}
+
+// =====================================================
+// BUILD COMPACT QA CONTEXT
+// =====================================================
+
+function buildChunkedQaContext(
+  analyses: ChunkAnalysis[]
+): string {
+
+  return `
+=====================================================
+PRE-ANALYZED APPLICATION QA EVIDENCE
+=====================================================
+
+The original application DOM was too large to send
+to the generation model directly.
+
+It was divided into semantic DOM chunks.
+
+Each chunk was independently analyzed by a QA agent.
+
+The JSON below contains QA-relevant evidence extracted
+from those chunks.
+
+IMPORTANT:
+
+- Treat this evidence as the source of truth.
+- Do not assume functionality not represented here.
+- Information may originate from different pages,
+  screens, modules, or sections of the application.
+- Deduplicate equivalent functionality.
+- Prefer user-facing and business-relevant behavior.
+- Do not invent missing relationships between modules.
+- Do not invent backend behavior.
+- Do not invent exact messages.
+- Do not invent redirects.
+- Do not invent business rules.
+
+CHUNK ANALYSES:
+
+${JSON.stringify(
+    analyses,
+    null,
+    2
+  )}
+`;
+}
+
+// =====================================================
 // POST /api/generate-tc
 // =====================================================
 
@@ -391,6 +642,8 @@ export async function POST(
 
     const {
       dom,
+
+      chunks,
 
       testFocus =
         "critical",
@@ -423,12 +676,13 @@ export async function POST(
     }
 
     // =================================================
-    // VALIDATE GROQ API KEY
+    // VALIDATE API KEY
     // =================================================
 
     if (
       !apiKey ||
-      typeof apiKey !== "string" ||
+      typeof apiKey !==
+      "string" ||
       !apiKey.trim()
     ) {
       return NextResponse.json(
@@ -579,8 +833,90 @@ export async function POST(
       );
 
     // =================================================
+    // CHOOSE PROCESSING MODE
+    // =================================================
+
+    const isLargeDom =
+      dom.length >
+      LARGE_DOM_THRESHOLD;
+
+    let sourceContext =
+      dom;
+
+    let processingMode:
+      "direct" |
+      "chunked" =
+        "direct";
+
+    let chunkCount =
+      0;
+
+    // =================================================
+    // LARGE DOM → CHUNK ANALYSIS
+    // =================================================
+
+    if (isLargeDom) {
+      processingMode =
+        "chunked";
+
+      const validatedChunks =
+        validateChunks(
+          chunks
+        );
+
+      chunkCount =
+        validatedChunks.length;
+
+      console.log(
+        "Large DOM detected."
+      );
+
+      console.log(
+        "Original cleaned DOM length:",
+        dom.length
+      );
+
+      console.log(
+        "Semantic chunks:",
+        chunkCount
+      );
+
+      console.log(
+        "Starting chunk QA analysis..."
+      );
+
+      // Use the smaller Generator model
+      // for map-stage chunk analysis.
+      const chunkAnalyses =
+        await analyzeChunks(
+          validatedChunks,
+          apiKey,
+          generatorModel
+        );
+
+      sourceContext =
+        buildChunkedQaContext(
+          chunkAnalyses
+        );
+
+      console.log(
+        "Chunk analysis complete."
+      );
+
+      console.log(
+        "Merged QA context length:",
+        sourceContext.length
+      );
+    }
+
+    // =================================================
     // LOG CONFIGURATION
     // =================================================
+
+    console.log(
+      "Processing mode:",
+      processingMode
+    );
 
     console.log(
       "Selected format:",
@@ -598,34 +934,34 @@ export async function POST(
     );
 
     console.log(
-      "Groq Generator model:",
+      "Generator model:",
       generatorModel
     );
 
     console.log(
-      "Groq Reviewer model:",
+      "Reviewer model:",
       reviewerModel
     );
 
     console.log(
-      "DOM length:",
-      dom.length
+      "Source context length:",
+      sourceContext.length
     );
 
     // NEVER log apiKey.
 
     // =====================================================
-    // 1. GENERATOR QA AGENT
+    // GENERATOR QA AGENT
     // =====================================================
 
     console.log(
-      "QA Generator is creating regression coverage with Groq..."
+      "QA Generator is creating regression coverage..."
     );
 
     const generationPrompt =
       getGenerationPrompt(
         format,
-        dom,
+        sourceContext,
         focus
       );
 
@@ -680,11 +1016,11 @@ export async function POST(
     );
 
     // =====================================================
-    // 2. REVIEWER QA AGENT
+    // REVIEWER QA AGENT
     // =====================================================
 
     console.log(
-      "QA Reviewer is reviewing generated regression coverage with Groq..."
+      "QA Reviewer is reviewing generated regression coverage..."
     );
 
     const seniorReviewRules =
@@ -701,10 +1037,19 @@ by another AI QA Engineer.
 
 You have:
 
-1. The original cleaned application DOM.
+1. Application QA evidence.
 2. The generated QA suite.
 3. The selected Test Focus.
 4. The required output format.
+
+The application evidence may be either:
+
+- A cleaned DOM for smaller applications.
+
+OR:
+
+- Structured QA evidence extracted from semantic
+  DOM chunks for larger applications.
 
 Your responsibility is to produce the FINAL,
 high-quality regression suite.
@@ -764,7 +1109,7 @@ GENERAL REVIEW RULES
 11. Remove unsupported assumptions.
 
 12. Do not invent functionality that cannot reasonably
-    be determined from the supplied DOM.
+    be determined from the supplied evidence.
 
 13. Do not assume:
 
@@ -779,7 +1124,7 @@ GENERAL REVIEW RULES
     - Permissions.
     - Business rules.
 
-    unless supported by the supplied DOM.
+    unless supported by the supplied evidence.
 
 14. Prefer user-facing behavior.
 
@@ -818,22 +1163,26 @@ The purpose is maximum regression value
 with minimum unnecessary maintenance.
 
 =====================================================
-DOM EVIDENCE
+APPLICATION EVIDENCE
 =====================================================
 
-The DOM is evidence of available functionality.
-
-Convert technical DOM evidence into meaningful
-user-facing QA coverage.
-
-Do not expose technical implementation details
-unless they directly affect user functionality.
+${sourceContext}
 
 =====================================================
 FORMAT RULES
 =====================================================
 
 ${seniorReviewRules}
+
+=====================================================
+GENERATED QA SUITE
+=====================================================
+
+${JSON.stringify(
+      generatorData,
+      null,
+      2
+    )}
 
 =====================================================
 FINAL RESPONSE
@@ -846,18 +1195,6 @@ Do not return Markdown.
 Do not use code fences.
 
 Do not include explanations before or after JSON.
-
-ORIGINAL CLEANED APPLICATION DOM:
-
-${dom}
-
-GENERATED QA SUITE:
-
-${JSON.stringify(
-      generatorData,
-      null,
-      2
-    )}
 `;
 
     const reviewerContent =
@@ -911,7 +1248,7 @@ ${JSON.stringify(
     );
 
     // =====================================================
-    // FINAL SAFETY CHECK - MAX TEST COUNT
+    // FINAL SAFETY CHECK
     // =====================================================
 
     if (
@@ -973,6 +1310,22 @@ ${JSON.stringify(
       workflow: {
         provider:
           "groq",
+
+        processingMode,
+
+        originalDomLength:
+          dom.length,
+
+        chunkCount,
+
+        analyzedChunks:
+          processingMode ===
+          "chunked"
+            ? chunkCount
+            : 0,
+
+        sourceContextLength:
+          sourceContext.length,
 
         testFocus:
           focus,
