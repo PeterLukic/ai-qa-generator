@@ -9,36 +9,23 @@ type TestCaseFormat =
 
 type TestFocus =
   | "critical"
+  | "smoke"
   | "positive"
   | "negative"
   | "edge"
-  | "smoke"
   | "balanced";
 
-type DetailedStep = {
-  step: number;
-  action: string;
-  expectedResult: string;
-};
-
-type DetailedTestCase = {
+type TableTestCase = {
   id: string;
-  name: string;
-  description: string;
-  preconditions: string[];
-  steps: DetailedStep[];
-  inputData: string[];
+  title: string;
   priority:
-    | "Critical"
-    | "High"
-    | "Medium"
-    | "Low";
-  actualResult: string;
-  testEnvironment: string;
-  executionStatus: string;
-  bugSeverity: string;
-  bugPriority: string;
-  notes: string;
+    | "P1"
+    | "P2"
+    | "P3";
+  testSteps: string[];
+  expectedResult: string;
+  status: string;
+  bugId: string;
 };
 
 type BddScenario = {
@@ -56,10 +43,12 @@ type GeneratedResult = {
   format:
     TestCaseFormat;
 
+  testFocus?: TestFocus;
+
   model?: string;
 
   testCases?:
-    DetailedTestCase[];
+    TableTestCase[];
 
   feature?: string;
 
@@ -161,24 +150,16 @@ export default function Home() {
         return;
       }
 
-      // =================================================
-      // TEMPORARY MAXIMUM TEST COUNT
-      //
-      // Backend still expects numberOfTests.
-      // Later the backend will use Test Focus directly.
-      // =================================================
-
-      const numberOfTests =
-        testFocus === "smoke"
-          ? 3
-          : 5;
-
       try {
-        setIsGenerating(true);
+        setIsGenerating(
+          true
+        );
 
         setError("");
 
-        setResult(null);
+        setResult(
+          null
+        );
 
         // =================================================
         // CALL GENERATE-TC API
@@ -188,7 +169,8 @@ export default function Home() {
           await fetch(
             "/api/generate-tc",
             {
-              method: "POST",
+              method:
+                "POST",
 
               headers: {
                 "Content-Type":
@@ -200,15 +182,14 @@ export default function Home() {
                   dom:
                     fileContent,
 
-                  numberOfTests,
-
                   testFocus,
 
                   testCaseFormat,
 
-                  // Groq Settings
                   apiKey,
+
                   generatorModel,
+
                   reviewerModel,
                 }),
             }
@@ -229,7 +210,9 @@ export default function Home() {
           data
         );
 
-        setResult(data);
+        setResult(
+          data
+        );
 
       } catch (err) {
         console.error(
@@ -343,7 +326,9 @@ export default function Home() {
                   cleanedContent
                 );
 
-                setResult(null);
+                setResult(
+                  null
+                );
 
                 setError("");
 
@@ -395,9 +380,7 @@ export default function Home() {
 
           <div className="mt-8 grid gap-6 md:grid-cols-2">
 
-            {/* =================================================
-                TEST FOCUS
-            ================================================= */}
+            {/* TEST FOCUS */}
 
             <div>
 
@@ -422,9 +405,7 @@ export default function Home() {
                     null
                   );
 
-                  setError(
-                    ""
-                  );
+                  setError("");
                 }}
 
                 className="mt-2 w-full rounded-lg border border-gray-300 p-3 text-gray-900"
@@ -432,6 +413,10 @@ export default function Home() {
 
                 <option value="critical">
                   Critical Regression (Recommended)
+                </option>
+
+                <option value="smoke">
+                  Smoke Tests
                 </option>
 
                 <option value="positive">
@@ -444,10 +429,6 @@ export default function Home() {
 
                 <option value="edge">
                   Edge Cases
-                </option>
-
-                <option value="smoke">
-                  Smoke Tests
                 </option>
 
                 <option value="balanced">
@@ -463,9 +444,7 @@ export default function Home() {
 
             </div>
 
-            {/* =================================================
-                TEST CASE FORMAT
-            ================================================= */}
+            {/* TEST CASE FORMAT */}
 
             <div>
 
@@ -490,9 +469,7 @@ export default function Home() {
                     null
                   );
 
-                  setError(
-                    ""
-                  );
+                  setError("");
                 }}
 
                 className="mt-2 w-full rounded-lg border border-gray-300 p-3 text-gray-900"
@@ -509,7 +486,7 @@ export default function Home() {
               </select>
 
               <p className="mt-2 text-sm text-gray-500">
-                Choose between structured test cases
+                Choose between Excel-friendly test cases
                 or automation-ready BDD scenarios.
               </p>
 
@@ -534,14 +511,12 @@ export default function Home() {
           >
 
             {isGenerating
-              ? "QA is generating test cases..."
+              ? "QA is generating regression coverage..."
               : "Generate Regression Tests"}
 
           </button>
 
-          {/* =================================================
-              ERROR
-          ================================================= */}
+          {/* ERROR */}
 
           {error && (
             <div className="mt-6 rounded-lg bg-red-50 p-4 text-red-700">
@@ -582,99 +557,101 @@ export default function Home() {
 
             {/* =====================================================
                 TABLE TEST CASES
-
-                Internally this still uses format "detailed"
-                until the backend is updated.
             ===================================================== */}
 
             {result.format ===
               "detailed" &&
               result.testCases && (
 
-                <div className="space-y-6">
+                <div className="overflow-x-auto">
 
-                  {result.testCases.map(
-                    (
-                      testCase
-                    ) => (
+                  <table className="min-w-full border-collapse border border-gray-300 text-left text-sm">
 
-                      <div
-                        key={
-                          testCase.id
-                        }
-                        className="rounded-xl border border-gray-200 p-6"
-                      >
+                    <thead className="bg-gray-100">
 
-                        {/* HEADER */}
+                      <tr>
 
-                        <div className="flex items-start justify-between gap-4">
+                        <th className="border border-gray-300 px-4 py-3 font-semibold text-gray-900">
+                          Test Case ID
+                        </th>
 
-                          <div>
+                        <th className="border border-gray-300 px-4 py-3 font-semibold text-gray-900">
+                          Title
+                        </th>
 
-                            <div className="text-sm font-bold text-blue-600">
+                        <th className="border border-gray-300 px-4 py-3 font-semibold text-gray-900">
+                          Priority
+                        </th>
+
+                        <th className="min-w-[300px] border border-gray-300 px-4 py-3 font-semibold text-gray-900">
+                          Test Steps
+                        </th>
+
+                        <th className="min-w-[260px] border border-gray-300 px-4 py-3 font-semibold text-gray-900">
+                          Expected Result
+                        </th>
+
+                        <th className="border border-gray-300 px-4 py-3 font-semibold text-gray-900">
+                          Status
+                        </th>
+
+                        <th className="border border-gray-300 px-4 py-3 font-semibold text-gray-900">
+                          Bug ID
+                        </th>
+
+                      </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                      {result.testCases.map(
+                        (
+                          testCase
+                        ) => (
+
+                          <tr
+                            key={
+                              testCase.id
+                            }
+                            className="align-top hover:bg-gray-50"
+                          >
+
+                            <td className="whitespace-nowrap border border-gray-300 px-4 py-4 font-semibold text-blue-700">
 
                               {
                                 testCase.id
                               }
 
-                            </div>
+                            </td>
 
-                            <h3 className="mt-1 text-xl font-bold text-gray-900">
+                            <td className="border border-gray-300 px-4 py-4 font-medium text-gray-900">
 
                               {
-                                testCase.name
+                                testCase.title
                               }
 
-                            </h3>
+                            </td>
 
-                          </div>
+                            <td className="whitespace-nowrap border border-gray-300 px-4 py-4">
 
-                          <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-semibold text-orange-700">
+                              <span className="rounded-full bg-orange-50 px-3 py-1 font-semibold text-orange-700">
 
-                            {
-                              testCase.priority
-                            }
+                                {
+                                  testCase.priority
+                                }
 
-                          </span>
+                              </span>
 
-                        </div>
+                            </td>
 
-                        {/* DESCRIPTION */}
+                            <td className="border border-gray-300 px-4 py-4 text-gray-700">
 
-                        <div className="mt-5">
+                              <ol className="list-decimal space-y-2 pl-5">
 
-                          <h4 className="font-semibold text-gray-900">
-                            Description
-                          </h4>
-
-                          <p className="mt-1 text-gray-700">
-
-                            {
-                              testCase.description
-                            }
-
-                          </p>
-
-                        </div>
-
-                        {/* PRECONDITIONS */}
-
-                        {testCase
-                          .preconditions
-                          ?.length >
-                          0 && (
-
-                            <div className="mt-5">
-
-                              <h4 className="font-semibold text-gray-900">
-                                Preconditions
-                              </h4>
-
-                              <ul className="mt-2 list-disc pl-6 text-gray-700">
-
-                                {testCase.preconditions.map(
+                                {testCase.testSteps?.map(
                                   (
-                                    precondition,
+                                    step,
                                     index
                                   ) => (
 
@@ -683,162 +660,51 @@ export default function Home() {
                                         index
                                       }
                                     >
-
-                                      {
-                                        precondition
-                                      }
-
+                                      {step}
                                     </li>
 
                                   )
                                 )}
 
-                              </ul>
+                              </ol>
 
-                            </div>
-                          )}
+                            </td>
 
-                        {/* =====================================================
-                            TEST STEPS
-                        ===================================================== */}
-
-                        <div className="mt-5">
-
-                          <h4 className="font-semibold text-gray-900">
-                            Test Steps
-                          </h4>
-
-                          <div className="mt-3 space-y-3">
-
-                            {testCase.steps?.map(
-                              (
-                                step
-                              ) => (
-
-                                <div
-                                  key={
-                                    step.step
-                                  }
-                                  className="rounded-lg bg-gray-50 p-4"
-                                >
-
-                                  <div className="font-medium text-gray-900">
-
-                                    {
-                                      step.step
-                                    }
-                                    .{" "}
-                                    {
-                                      step.action
-                                    }
-
-                                  </div>
-
-                                  <div className="mt-2 text-green-700">
-
-                                    <strong>
-                                      Expected:
-                                    </strong>{" "}
-
-                                    {
-                                      step.expectedResult
-                                    }
-
-                                  </div>
-
-                                </div>
-
-                              )
-                            )}
-
-                          </div>
-
-                        </div>
-
-                        {/* INPUT DATA */}
-
-                        {testCase
-                          .inputData
-                          ?.length >
-                          0 && (
-
-                            <div className="mt-5">
-
-                              <h4 className="font-semibold text-gray-900">
-                                Input Data
-                              </h4>
-
-                              <ul className="mt-2 list-disc pl-6 text-gray-700">
-
-                                {testCase.inputData.map(
-                                  (
-                                    data,
-                                    index
-                                  ) => (
-
-                                    <li
-                                      key={
-                                        index
-                                      }
-                                    >
-
-                                      {
-                                        data
-                                      }
-
-                                    </li>
-
-                                  )
-                                )}
-
-                              </ul>
-
-                            </div>
-                          )}
-
-                        {/* =====================================================
-                            EXECUTION INFO
-                        ===================================================== */}
-
-                        <div className="mt-6 grid gap-4 border-t border-gray-200 pt-5 md:grid-cols-2">
-
-                          <div>
-
-                            <span className="font-semibold text-gray-900">
-                              Execution Status:
-                            </span>{" "}
-
-                            <span className="text-gray-700">
+                            <td className="border border-gray-300 px-4 py-4 text-gray-700">
 
                               {
-                                testCase.executionStatus
+                                testCase.expectedResult
                               }
 
-                            </span>
+                            </td>
 
-                          </div>
+                            <td className="whitespace-nowrap border border-gray-300 px-4 py-4">
 
-                          <div>
+                              <span className="rounded-full bg-gray-100 px-3 py-1 font-medium text-gray-700">
 
-                            <span className="font-semibold text-gray-900">
-                              Test Environment:
-                            </span>{" "}
+                                {
+                                  testCase.status
+                                }
 
-                            <span className="text-gray-700">
+                              </span>
 
-                              {testCase.testEnvironment ||
-                                "Not specified"}
+                            </td>
 
-                            </span>
+                            <td className="border border-gray-300 px-4 py-4 text-gray-700">
 
-                          </div>
+                              {testCase.bugId ||
+                                "—"}
 
-                        </div>
+                            </td>
 
-                      </div>
+                          </tr>
 
-                    )
-                  )}
+                        )
+                      )}
+
+                    </tbody>
+
+                  </table>
 
                 </div>
               )}
@@ -852,8 +718,6 @@ export default function Home() {
               result.scenarios && (
 
                 <div>
-
-                  {/* FEATURE */}
 
                   <div className="mb-6 rounded-lg bg-gray-900 p-5 text-white">
 
@@ -930,13 +794,9 @@ export default function Home() {
 
                           </h3>
 
-                          {/* =====================================================
-                              GHERKIN
-                          ===================================================== */}
+                          {/* GHERKIN */}
 
                           <div className="mt-5 rounded-lg bg-gray-50 p-5 font-mono text-sm text-gray-800">
-
-                            {/* GIVEN */}
 
                             {scenario.given?.map(
                               (
@@ -958,16 +818,12 @@ export default function Home() {
 
                                   </span>{" "}
 
-                                  {
-                                    step
-                                  }
+                                  {step}
 
                                 </div>
 
                               )
                             )}
-
-                            {/* WHEN */}
 
                             {scenario.when?.map(
                               (
@@ -989,16 +845,12 @@ export default function Home() {
 
                                   </span>{" "}
 
-                                  {
-                                    step
-                                  }
+                                  {step}
 
                                 </div>
 
                               )
                             )}
-
-                            {/* THEN */}
 
                             {scenario.then?.map(
                               (
@@ -1020,9 +872,7 @@ export default function Home() {
 
                                   </span>{" "}
 
-                                  {
-                                    step
-                                  }
+                                  {step}
 
                                 </div>
 
