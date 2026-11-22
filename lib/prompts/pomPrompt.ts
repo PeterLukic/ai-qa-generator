@@ -971,52 +971,395 @@ ${className}
 Preferred structure:
 
 export class ${className} {
-  readonly screen:
-    MobileScreen;
+  readonly title;
+  readonly emailField;
+  readonly passwordField;
+  readonly loginButton;
 
-  readonly exampleInput;
-  readonly primaryButton;
-
-  constructor(
-    screen:
-      MobileScreen
-  ) {
-    this.screen =
-      screen;
-
-    this.exampleInput =
+  constructor(screen: MobileScreen) {
+    this.title =
       screen.getByTestId(
-        "example_input"
+        "login_title"
       );
 
-    this.primaryButton =
+    this.emailField =
       screen.getByTestId(
-        "primary_button"
+        "login_email_text_field"
+      );
+
+    this.passwordField =
+      screen.getByTestId(
+        "login_password_text_field"
+      );
+
+    this.loginButton =
+      screen.getByTestId(
+        "login_submit_button"
       );
   }
 
-  async enterExample(
-    value: string
+  async enterEmail(
+    email: string
   ): Promise<void> {
-    await this.exampleInput
-      .fill(
-        value
-      );
+    await this.emailField.fill(
+      email
+    );
   }
 
-  async tapPrimaryButton(): Promise<void> {
-    await this.primaryButton
-      .tap();
+  async enterPassword(
+    password: string
+  ): Promise<void> {
+    await this.passwordField.fill(
+      password
+    );
+  }
+
+  async tapLoginButton(): Promise<void> {
+    await this.loginButton.tap();
   }
 }
 
-Use only locator information actually present in the supplied mobile DOM.
+=====================================================
+MOBILEWRIGHT INPUT MODEL
+=====================================================
 
-Do not invent resource IDs, test IDs,
-accessibility labels, visible text,
-content descriptions or platform attributes.
+Treat the supplied input as a mobile accessibility/view tree
+when Mobilewright is selected.
 
-Do not generate Playwright Web code.
+Do NOT treat the supplied input as normal web HTML.
+
+When later universal rules refer to "DOM",
+interpret "DOM" as the supplied mobile view tree
+for Mobilewright generation.
+
+The mobile accessibility/view tree is the source of truth.
+
+=====================================================
+MOBILEWRIGHT LOCATOR PRIORITY
+=====================================================
+
+Use this locator priority when supported by the supplied
+mobile view tree:
+
+1. getByTestId()
+2. getByLabel()
+3. getByRole()
+4. getByText()
+5. getByPlaceholder() only when placeholder information
+   is explicitly present in the mobile view tree
+
+Prefer explicit mobile test IDs when available.
+
+Example:
+
+screen.getByTestId(
+  "login_email_text_field"
+)
+
+is preferred when that exact test ID exists in the
+supplied mobile tree.
+
+Do NOT invent a test ID based on this example.
+
+=====================================================
+MOBILEWRIGHT UNIQUE LOCATOR RULES
+=====================================================
+
+Every meaningful Page Object element should have a locator
+that identifies its intended semantic element as uniquely
+and reliably as the supplied mobile tree allows.
+
+Do NOT assign the exact same locator expression to two
+different semantic elements.
+
+For example, this is NOT acceptable:
+
+this.title =
+  screen.getByText(
+    "Login"
+  );
+
+this.loginButton =
+  screen.getByText(
+    "Login"
+  );
+
+if the screen contains both a title and a button
+with the visible text "Login".
+
+In that case:
+
+- Prefer getByTestId() when an explicit test ID exists.
+- Prefer getByLabel() when an explicit accessibility label exists.
+- Prefer getByRole() when role information exists and distinguishes
+  the intended element.
+- Use getByText() only when the text locator identifies the intended
+  element reliably enough from the supplied tree.
+
+If two different elements share the same visible text and
+the supplied mobile tree does NOT provide enough evidence
+to distinguish them, OMIT the ambiguous locator rather than
+inventing a selector.
+
+Do not use one ambiguous text locator merely because it
+matches the expected visible text.
+
+=====================================================
+MOBILEWRIGHT SEMANTIC NAMING
+=====================================================
+
+Locator property names MUST reflect the actual semantic
+purpose and interaction type of the element.
+
+Examples:
+
+GOOD:
+
+loginButton
+forgotPasswordButton
+forgotPasswordLink
+registerButton
+emailField
+passwordField
+screenTitle
+validationMessage
+
+BAD:
+
+forgotPasswordHeader
+
+when that element is actually tappable and used as a button
+or link.
+
+If a locator is used by a method named:
+
+tapForgotPasswordButton()
+
+then the corresponding locator should normally be named:
+
+forgotPasswordButton
+
+unless the supplied mobile tree clearly identifies the control
+as another semantic type such as a link.
+
+Do NOT name an interactive element "Header" merely because
+its visible text resembles a heading.
+
+=====================================================
+MOBILE VIEW TREE IS THE SOURCE OF TRUTH
+=====================================================
+
+Every locator MUST be supported by the supplied
+mobile view tree or by additional explicit locator
+information supplied by the user.
+
+Do NOT invent:
+
+- test IDs
+- resource IDs
+- accessibility labels
+- content descriptions
+- visible text
+- placeholders
+- roles
+- platform attributes
+- native selectors
+
+If a reliable locator cannot be determined,
+omit that element.
+
+Never invent a test ID merely because an example
+structure contains a similar test ID.
+
+=====================================================
+MEANINGFUL MOBILE ELEMENTS
+=====================================================
+
+Generate locators only for meaningful mobile
+automation elements that are actually present.
+
+Examples include:
+
+- screen titles
+- email fields
+- username fields
+- password fields
+- buttons
+- forgot-password controls
+- registration controls
+- social-login controls
+- navigation controls
+- tabs
+- menus
+- checkboxes
+- radio buttons
+- switches
+- dropdowns
+- validation messages
+- error messages
+- success messages
+- important status text
+- business-critical information
+
+Do NOT create a locator for every node.
+
+Ignore:
+
+- layout-only nodes
+- decorative nodes
+- meaningless wrappers
+- framework implementation nodes
+- hidden technical nodes
+- non-interactive noise
+
+=====================================================
+MOBILE ACTION METHODS
+=====================================================
+
+Use:
+
+fill()
+
+for editable fields when supported.
+
+Use:
+
+tap()
+
+for tappable controls when supported.
+
+Action methods MUST reuse already declared locators.
+
+Do NOT recreate locators inside action methods.
+
+Examples:
+
+async enterEmail(
+  email: string
+): Promise<void> {
+  await this.emailField.fill(
+    email
+  );
+}
+
+async tapLoginButton(): Promise<void> {
+  await this.loginButton.tap();
+}
+
+Generate action methods only when the supplied
+mobile tree clearly supports that interaction.
+
+Method names must match the semantic locator names.
+
+For example:
+
+readonly forgotPasswordButton;
+
+should pair naturally with:
+
+async tapForgotPasswordButton(): Promise<void>
+
+Do NOT create a tap method for an element that the
+supplied mobile tree does not identify as interactive.
+
+=====================================================
+COMBINED MOBILE WORKFLOWS
+=====================================================
+
+A combined workflow method may be generated when
+the full interaction is clearly supported.
+
+For example, if username/email, password and login
+controls are all present:
+
+async login(
+  username: string,
+  password: string
+): Promise<void> {
+  await this.enterUsername(
+    username
+  );
+
+  await this.enterPassword(
+    password
+  );
+
+  await this.tapLoginButton();
+}
+
+Do NOT create combined flows that require assumed
+navigation or unsupported behavior.
+
+=====================================================
+DYNAMIC MESSAGES AND ADDITIONAL LOCATORS
+=====================================================
+
+A validation, error or success message may be exposed
+as a locator when its locator evidence is supplied.
+
+For example, if the user separately supplies:
+
+Pogrešni podaci za prijavu ili nalog nije aktivan.
+
+and explicitly identifies it as an accessibility label,
+the generated Page Object may contain:
+
+this.failedLoginMessage =
+  screen.getByLabel(
+    "Pogrešni podaci za prijavu ili nalog nije aktivan."
+  );
+
+However:
+
+- Do NOT invent an error message.
+- Do NOT assume an error exists just because a login screen exists.
+- Do NOT assume successful login behavior.
+- Do NOT assume failed login behavior.
+- Do NOT infer a locator for a dynamic message without evidence.
+
+=====================================================
+MOBILEWRIGHT REVIEW CHECK
+=====================================================
+
+Before returning Mobilewright code verify:
+
+- No two different semantic elements use the exact same
+  ambiguous locator expression.
+- A title and button with identical text are not both located
+  using the same getByText() call.
+- Tappable controls have names such as Button, Link, Tab,
+  MenuItem or another correct semantic name.
+- Non-interactive text is not given unnecessary tap methods.
+- Every getByTestId() value exists in the supplied mobile input.
+- Every getByLabel() value exists in the supplied mobile input.
+- Every getByText() value exists in the supplied mobile input.
+- Every getByRole() call is supported by explicit role evidence.
+- No web CSS selector has been introduced.
+- Action methods reuse the declared locators.
+
+=====================================================
+IMPORTANT MOBILEWRIGHT RULES
+=====================================================
+
+- Generate valid TypeScript.
+- Generate Mobilewright code, not Playwright Web code.
+- Prefer getByTestId() when explicit reliable mobile test IDs exist.
+- Prefer getByLabel() when an explicit accessibility label exists.
+- Prefer getByRole() when explicit role evidence exists.
+- Use getByText() only when it is sufficiently unambiguous.
+- Do not convert web CSS selectors into Mobilewright selectors.
+- Do not use CSS selectors.
+- Do not invent resource IDs.
+- Do not invent test IDs.
+- Do not invent labels.
+- Do not invent visible text.
+- Do not invent roles.
+- Do not invent user flows.
+- Do not invent navigation destinations.
+- Do not invent URLs.
+- Do not include assertions inside the Page Object.
+- Important locators must remain reusable by tests
+  and Step Definitions.
 `;
 
     default:
@@ -1127,7 +1470,7 @@ ${stackRules}
 UNIVERSAL PAGE OBJECT RULES
 =====================================================
 
-1. Analyze the DOM carefully before generating code.
+1. Analyze the supplied input carefully before generating code.
 
 2. Understand the user-facing purpose of the supplied page,
 screen, component or module.
@@ -1154,7 +1497,7 @@ Focus primarily on:
 - Important status information
 - Business-critical information
 
-4. Do NOT create a locator for every DOM element.
+4. Do NOT create a locator for every element.
 
 5. Ignore irrelevant implementation elements:
 
@@ -1169,11 +1512,17 @@ Focus primarily on:
 - irrelevant metadata
 
 =====================================================
-DOM IS THE SOURCE OF TRUTH
+SUPPLIED INPUT IS THE SOURCE OF TRUTH
 =====================================================
 
 6. Every selector or locator MUST be supported
-by information in the supplied DOM.
+by information in the supplied input.
+
+For web frameworks, the supplied input is normally
+the application DOM / HTML.
+
+For Mobilewright, the supplied input must be treated
+as the mobile accessibility/view tree.
 
 7. Do NOT invent:
 
@@ -1190,8 +1539,8 @@ by information in the supplied DOM.
 - accessibility labels
 - content descriptions
 
-8. If the DOM does not provide enough information
-for a reliable locator, omit it.
+8. If the supplied input does not provide enough
+information for a reliable locator, omit it.
 
 9. Never guess a selector merely because it would
 be convenient for automation.
@@ -1201,7 +1550,7 @@ be convenient for automation.
 - generated CSS classes
 - styling-only CSS classes
 - framework-specific CSS classes
-- deep DOM hierarchy
+- deep hierarchy
 - nth-child
 - nth-of-type
 - random framework attributes
@@ -1256,10 +1605,19 @@ fieldX
 
 14. Avoid duplicate locators representing the same element.
 
-15. Important reusable locators must remain accessible
+15. Do NOT assign an identical ambiguous locator to
+different semantic elements.
+
+If two elements share the same visible text,
+prefer a locator that distinguishes their semantic roles.
+
+If the supplied input cannot distinguish them reliably,
+omit the ambiguous locator rather than inventing one.
+
+16. Important reusable locators must remain accessible
 to the automation layer.
 
-16. Do not hide important locators behind private access
+17. Do not hide important locators behind private access
 when Step Definitions or tests may reasonably need them
 for assertions.
 
@@ -1267,8 +1625,8 @@ for assertions.
 ACTION METHODS
 =====================================================
 
-17. Create reusable methods only for meaningful
-user actions supported by the DOM.
+18. Create reusable methods only for meaningful
+user actions supported by the supplied input.
 
 Examples:
 
@@ -1281,20 +1639,20 @@ enterTransferAmount()
 search()
 openMenu()
 
-18. Action methods MUST reuse already declared
+19. Action methods MUST reuse already declared
 locators, selector properties or selector getters.
 
-19. Do NOT recreate selectors inside action methods.
+20. Do NOT recreate selectors inside action methods.
 
-20. Do NOT generate methods for functionality
-that is not supported by the DOM.
+21. Do NOT generate methods for functionality
+that is not supported by the supplied input.
 
-21. Do NOT create meaningless wrapper methods
+22. Do NOT create meaningless wrapper methods
 just to increase code size.
 
-22. A useful combined workflow method may be added
+23. A useful combined workflow method may be added
 only when it represents an obvious user action
-supported by the supplied DOM.
+supported by the supplied input.
 
 For example, on a login form it may be reasonable
 to provide a login(username, password) method
@@ -1305,7 +1663,7 @@ all clearly present.
 ASSERTION RESPONSIBILITY
 =====================================================
 
-23. Do NOT put test assertions inside the Page Object.
+24. Do NOT put test assertions inside the Page Object.
 
 The Page Object should expose:
 
@@ -1322,7 +1680,7 @@ Assertions belong in:
 NO INVENTED BEHAVIOR
 =====================================================
 
-24. Do NOT assume:
+25. Do NOT assume:
 
 - Login success behavior
 - Redirect behavior
@@ -1340,28 +1698,28 @@ NO INVENTED BEHAVIOR
 
 unless directly supported by the supplied input.
 
-25. Do NOT invent URLs.
+26. Do NOT invent URLs.
 
-26. Do NOT generate navigation methods that require
+27. Do NOT generate navigation methods that require
 an invented destination.
 
 =====================================================
 DO NOT GENERATE
 =====================================================
 
-27. Do NOT generate test cases.
+28. Do NOT generate test cases.
 
-28. Do NOT generate BDD scenarios.
+29. Do NOT generate BDD scenarios.
 
-29. Do NOT generate Step Definitions.
+30. Do NOT generate Step Definitions.
 
-30. Do NOT generate fixtures.
+31. Do NOT generate fixtures.
 
-31. Do NOT generate configuration files.
+32. Do NOT generate configuration files.
 
-32. Do NOT generate sample tests.
+33. Do NOT generate sample tests.
 
-33. Do NOT generate explanation text.
+34. Do NOT generate explanation text.
 
 =====================================================
 LANGUAGE QUALITY
@@ -1393,11 +1751,13 @@ Before returning the code verify:
 
 - class name is exactly ${className}
 - selected stack is exactly ${stackLabel}
-- every selector is supported by the DOM
+- every selector is supported by the supplied input
 - no selector is invented
 - semantic selectors are preferred over styling classes
 - no duplicate selector exists
+- no ambiguous locator is assigned to different semantic elements
 - action methods reuse declared selectors
+- locator names match the semantic role of the elements
 - no unnecessary assertions exist
 - no test code exists
 - no BDD code exists
@@ -1422,7 +1782,7 @@ Do NOT include explanations before the code.
 Do NOT include explanations after the code.
 
 =====================================================
-APPLICATION DOM
+APPLICATION INPUT
 =====================================================
 
 ${dom}
@@ -1502,7 +1862,7 @@ REVIEW RESPONSIBILITIES
 
 10. Prefer meaningful user-facing selectors.
 
-11. Every selector MUST be supported by the supplied DOM.
+11. Every selector MUST be supported by the supplied input.
 
 12. Do NOT invent selectors.
 
@@ -1513,31 +1873,48 @@ REVIEW RESPONSIBILITIES
 15. Prefer semantic selectors over styling or framework CSS classes
 when a stable semantic alternative exists.
 
-16. Keep locator names descriptive.
+16. Do NOT allow two different semantic elements to use the
+same ambiguous locator expression.
 
-17. Keep action methods reusable and user-focused.
+For example, if both a title and a button display "Login",
+do not keep both as:
 
-18. Action methods MUST reuse selectors already
+getByText("Login")
+
+unless the supplied input provides enough evidence that the
+locator expressions uniquely distinguish the elements.
+
+17. If a locator cannot be made reliable using evidence from
+the supplied input, remove that locator rather than inventing one.
+
+18. Keep locator names descriptive and semantically correct.
+
+A tappable button should normally be named somethingButton,
+not somethingHeader.
+
+19. Keep action methods reusable and user-focused.
+
+20. Action methods MUST reuse selectors already
 declared in the Page Object.
 
-19. Do NOT recreate selectors inside methods.
+21. Do NOT recreate selectors inside methods.
 
-20. Important reusable automation elements must
+22. Important reusable automation elements must
 remain accessible to tests and Step Definitions.
 
-21. Do NOT add assertions to the Page Object.
+23. Do NOT add assertions to the Page Object.
 
-22. Do NOT generate tests.
+24. Do NOT generate tests.
 
-23. Do NOT generate BDD scenarios.
+25. Do NOT generate BDD scenarios.
 
-24. Do NOT generate Step Definitions.
+26. Do NOT generate Step Definitions.
 
-25. Do NOT invent URLs.
+27. Do NOT invent URLs.
 
-26. Do NOT invent redirect behavior.
+28. Do NOT invent redirect behavior.
 
-27. Do NOT invent error or success behavior.
+29. Do NOT invent error or success behavior.
 
 =====================================================
 LANGUAGE QUALITY
@@ -1553,11 +1930,12 @@ Verify:
 
 - class name is exactly ${className}
 - stack is exactly ${stackLabel}
-- selectors exist in the DOM
+- selectors exist in the supplied input
 - no selector is invented
 - semantic selectors are preferred over styling classes
 - no duplicate locator exists
-- no unused locator exists
+- no ambiguous locator is assigned to different semantic elements
+- locator names represent the actual semantic element
 - methods reuse declared selectors
 - no unnecessary assertions exist
 - no test code exists
@@ -1577,7 +1955,7 @@ Do NOT use triple backticks.
 Do NOT include explanations.
 
 =====================================================
-ORIGINAL DOM
+ORIGINAL APPLICATION INPUT
 =====================================================
 
 ${dom}
