@@ -1,26 +1,37 @@
-export type PomFramework =
-  | "playwright"
-  | "mobilewright";
+import {
+  getPomStackLabel,
+  type PomFramework,
+  type PomLanguage,
+} from "@/lib/pomConfig";
 
-export function getPomPrompt(
-  dom: string,
-  className: string,
-  framework: PomFramework
+function getStackRules(
+  language: PomLanguage,
+  framework: PomFramework,
+  className: string
 ): string {
-  const frameworkRules =
-    framework === "playwright"
-      ? `
-=====================================================
-FRAMEWORK: PLAYWRIGHT TYPESCRIPT
-=====================================================
+  const stack =
+    `${language}:${framework}`;
 
-Generate a Playwright TypeScript Page Object Model.
+  switch (stack) {
+    // =====================================================
+    // PLAYWRIGHT TYPESCRIPT
+    // =====================================================
+
+    case "typescript:playwright":
+      return `
+=====================================================
+STACK: PLAYWRIGHT + TYPESCRIPT
+=====================================================
 
 Use:
 
 import { Page, Locator } from "@playwright/test";
 
-The class should follow this general structure:
+Generate a TypeScript class exactly named:
+
+${className}
+
+Preferred structure:
 
 export class ${className} {
   readonly page: Page;
@@ -51,215 +62,984 @@ export class ${className} {
   }
 }
 
-=====================================================
-PLAYWRIGHT LOCATOR PRIORITY
-=====================================================
-
-Prefer stable Playwright locators.
-
-Use this general priority when supported by the DOM:
+LOCATOR PRIORITY WHEN SUPPORTED BY THE DOM:
 
 1. getByTestId()
 2. getByRole()
 3. getByLabel()
 4. getByPlaceholder()
 5. getByText()
-6. locator() with a stable CSS selector
+6. locator() with stable CSS
 
-Do NOT automatically choose getByTestId() if no test ID
-actually exists in the DOM.
+Important reusable locators MUST be public readonly.
 
-Every locator must be supported by the supplied DOM.
+Do not use private or protected locators.
+`;
 
-Avoid XPath unless absolutely necessary.
+    // =====================================================
+    // PLAYWRIGHT JAVASCRIPT
+    // =====================================================
 
-Avoid fragile selectors based on:
-
-- generated CSS classes
-- deeply nested DOM structure
-- nth-child
-- nth-of-type
-- dynamic IDs
-- random framework attributes
-- positional selectors
-
-Prefer Playwright-native locators.
-
+    case "javascript:playwright":
+      return `
 =====================================================
-PLAYWRIGHT ACTION METHODS
+STACK: PLAYWRIGHT + JAVASCRIPT
 =====================================================
 
-Create useful reusable methods when the DOM supports them.
+Generate modern JavaScript.
 
-Examples:
+Use an exported class exactly named:
 
-enterSearchTerm()
-clickSubmit()
-openProfile()
-selectCountry()
-checkAgreement()
-uncheckAgreement()
-clickMenu()
-submitForm()
+${className}
 
-Use Playwright interactions such as:
+Preferred structure:
 
-fill()
-click()
-check()
-uncheck()
-selectOption()
-press()
+export class ${className} {
+  constructor(page) {
+    this.page = page;
 
-when appropriate.
+    this.exampleInput =
+      page.getByPlaceholder("Example");
 
-Do not create meaningless wrapper methods for every locator.
-`
-      : `
+    this.primaryButton =
+      page.getByRole("button", {
+        name: "Submit",
+      });
+  }
+
+  async enterExample(value) {
+    await this.exampleInput.fill(value);
+  }
+
+  async clickPrimaryButton() {
+    await this.primaryButton.click();
+  }
+}
+
+LOCATOR PRIORITY WHEN SUPPORTED BY THE DOM:
+
+1. getByTestId()
+2. getByRole()
+3. getByLabel()
+4. getByPlaceholder()
+5. getByText()
+6. locator() with stable CSS
+
+Keep reusable locators publicly accessible.
+
+Do not use TypeScript syntax.
+`;
+
+    // =====================================================
+    // PLAYWRIGHT PYTHON
+    // =====================================================
+
+    case "python:playwright":
+      return `
 =====================================================
-FRAMEWORK: MOBILEWRIGHT TYPESCRIPT
+STACK: PLAYWRIGHT + PYTHON
 =====================================================
 
-Generate a Mobilewright TypeScript Page Object Model.
+Use the Playwright Python synchronous API.
+
+Use:
+
+from playwright.sync_api import Page, Locator
+
+Generate a Python class exactly named:
+
+${className}
+
+Preferred structure:
+
+class ${className}:
+    def __init__(
+        self,
+        page: Page
+    ) -> None:
+        self.page = page
+
+        self.example_input = (
+            page.get_by_placeholder(
+                "Example"
+            )
+        )
+
+        self.primary_button = (
+            page.get_by_role(
+                "button",
+                name="Submit"
+            )
+        )
+
+    def enter_example(
+        self,
+        value: str
+    ) -> None:
+        self.example_input.fill(
+            value
+        )
+
+    def click_primary_button(
+        self
+    ) -> None:
+        self.primary_button.click()
+
+LOCATOR PRIORITY WHEN SUPPORTED BY THE DOM:
+
+1. get_by_test_id()
+2. get_by_role()
+3. get_by_label()
+4. get_by_placeholder()
+5. get_by_text()
+6. locator() with stable CSS
+
+Use public instance attributes for reusable locators.
+
+Use Python snake_case for locator and method names.
+`;
+
+    // =====================================================
+    // PLAYWRIGHT JAVA
+    // =====================================================
+
+    case "java:playwright":
+      return `
+=====================================================
+STACK: PLAYWRIGHT + JAVA
+=====================================================
+
+Use:
+
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+
+Generate a public Java class exactly named:
+
+${className}
+
+Preferred structure:
+
+public class ${className} {
+    private final Page page;
+
+    public final Locator exampleInput;
+    public final Locator primaryButton;
+
+    public ${className}(
+        Page page
+    ) {
+        this.page = page;
+
+        this.exampleInput =
+            page.getByPlaceholder(
+                "Example"
+            );
+
+        this.primaryButton =
+            page.getByRole(
+                AriaRole.BUTTON,
+                new Page.GetByRoleOptions()
+                    .setName("Submit")
+            );
+    }
+
+    public void enterExample(
+        String value
+    ) {
+        exampleInput.fill(
+            value
+        );
+    }
+
+    public void clickPrimaryButton() {
+        primaryButton.click();
+    }
+}
+
+Add any Playwright Java imports actually required by generated code.
+
+Important reusable Locators should be public final.
+
+Do not generate JavaScript or TypeScript syntax.
+`;
+
+    // =====================================================
+    // PLAYWRIGHT C#
+    // =====================================================
+
+    case "csharp:playwright":
+      return `
+=====================================================
+STACK: PLAYWRIGHT + C#
+=====================================================
+
+Use:
+
+using Microsoft.Playwright;
+
+Generate a public C# class exactly named:
+
+${className}
+
+Preferred structure:
+
+public class ${className}
+{
+    public IPage Page { get; }
+
+    public ILocator ExampleInput { get; }
+    public ILocator PrimaryButton { get; }
+
+    public ${className}(
+        IPage page
+    )
+    {
+        Page = page;
+
+        ExampleInput =
+            page.GetByPlaceholder(
+                "Example"
+            );
+
+        PrimaryButton =
+            page.GetByRole(
+                AriaRole.Button,
+                new()
+                {
+                    Name = "Submit"
+                }
+            );
+    }
+
+    public async Task EnterExampleAsync(
+        string value
+    )
+    {
+        await ExampleInput.FillAsync(
+            value
+        );
+    }
+
+    public async Task ClickPrimaryButtonAsync()
+    {
+        await PrimaryButton.ClickAsync();
+    }
+}
+
+Use async Task methods where appropriate.
+
+Important reusable ILocator properties should be public.
+
+Do not generate TypeScript syntax.
+`;
+
+    // =====================================================
+    // SELENIUM TYPESCRIPT
+    // =====================================================
+
+    case "typescript:selenium":
+      return `
+=====================================================
+STACK: SELENIUM + TYPESCRIPT
+=====================================================
+
+Use:
+
+import {
+  By,
+  WebDriver,
+} from "selenium-webdriver";
+
+Generate a TypeScript class exactly named:
+
+${className}
+
+Preferred structure:
+
+export class ${className} {
+  readonly driver: WebDriver;
+
+  readonly exampleInput =
+    By.name("example");
+
+  readonly primaryButton =
+    By.css(
+      'button[type="submit"]'
+    );
+
+  constructor(
+    driver: WebDriver
+  ) {
+    this.driver =
+      driver;
+  }
+
+  async enterExample(
+    value: string
+  ): Promise<void> {
+    await this.driver
+      .findElement(
+        this.exampleInput
+      )
+      .sendKeys(
+        value
+      );
+  }
+}
+
+Use stable Selenium By locators.
+
+Preferred locator strategies when supported:
+
+1. By.id()
+2. By.name()
+3. stable data/test attributes
+4. By.css()
+5. By.xpath() only when necessary
+
+Important selector definitions must be reusable readonly properties.
+`;
+
+    // =====================================================
+    // SELENIUM JAVASCRIPT
+    // =====================================================
+
+    case "javascript:selenium":
+      return `
+=====================================================
+STACK: SELENIUM + JAVASCRIPT
+=====================================================
+
+Use modern JavaScript with selenium-webdriver.
+
+Use:
+
+import {
+  By,
+} from "selenium-webdriver";
+
+Generate an exported class exactly named:
+
+${className}
+
+Preferred structure:
+
+export class ${className} {
+  constructor(driver) {
+    this.driver =
+      driver;
+
+    this.exampleInput =
+      By.name(
+        "example"
+      );
+
+    this.primaryButton =
+      By.css(
+        'button[type="submit"]'
+      );
+  }
+
+  async enterExample(value) {
+    await this.driver
+      .findElement(
+        this.exampleInput
+      )
+      .sendKeys(
+        value
+      );
+  }
+}
+
+Do not generate TypeScript types.
+
+Use stable Selenium selectors supported by the DOM.
+`;
+
+    // =====================================================
+    // SELENIUM PYTHON
+    // =====================================================
+
+    case "python:selenium":
+      return `
+=====================================================
+STACK: SELENIUM + PYTHON
+=====================================================
+
+Use:
+
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
+
+Generate a Python class exactly named:
+
+${className}
+
+Preferred structure:
+
+class ${className}:
+    def __init__(
+        self,
+        driver: WebDriver
+    ) -> None:
+        self.driver = driver
+
+        self.example_input = (
+            By.NAME,
+            "example"
+        )
+
+        self.primary_button = (
+            By.CSS_SELECTOR,
+            'button[type="submit"]'
+        )
+
+    def enter_example(
+        self,
+        value: str
+    ) -> None:
+        self.driver.find_element(
+            *self.example_input
+        ).send_keys(
+            value
+        )
+
+Use public reusable locator tuples.
+
+Prefer:
+
+1. ID
+2. NAME
+3. stable CSS
+4. XPath only when necessary
+
+Use Python snake_case.
+`;
+
+    // =====================================================
+    // SELENIUM JAVA
+    // =====================================================
+
+    case "java:selenium":
+      return `
+=====================================================
+STACK: SELENIUM + JAVA
+=====================================================
+
+Use:
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+
+Generate a public Java class exactly named:
+
+${className}
+
+Preferred structure:
+
+public class ${className} {
+    private final WebDriver driver;
+
+    public final By exampleInput =
+        By.name(
+            "example"
+        );
+
+    public final By primaryButton =
+        By.cssSelector(
+            "button[type='submit']"
+        );
+
+    public ${className}(
+        WebDriver driver
+    ) {
+        this.driver =
+            driver;
+    }
+
+    public void enterExample(
+        String value
+    ) {
+        driver
+            .findElement(
+                exampleInput
+            )
+            .sendKeys(
+                value
+            );
+    }
+}
+
+Important selector definitions should be public final By values.
+
+Prefer stable ID, name and CSS selectors.
+
+Use XPath only when necessary.
+`;
+
+    // =====================================================
+    // SELENIUM C#
+    // =====================================================
+
+    case "csharp:selenium":
+      return `
+=====================================================
+STACK: SELENIUM + C#
+=====================================================
+
+Use:
+
+using OpenQA.Selenium;
+
+Generate a public C# class exactly named:
+
+${className}
+
+Preferred structure:
+
+public class ${className}
+{
+    private readonly IWebDriver _driver;
+
+    public By ExampleInput { get; } =
+        By.Name(
+            "example"
+        );
+
+    public By PrimaryButton { get; } =
+        By.CssSelector(
+            "button[type='submit']"
+        );
+
+    public ${className}(
+        IWebDriver driver
+    )
+    {
+        _driver =
+            driver;
+    }
+
+    public void EnterExample(
+        string value
+    )
+    {
+        _driver
+            .FindElement(
+                ExampleInput
+            )
+            .SendKeys(
+                value
+            );
+    }
+}
+
+Important selector definitions should be public By properties.
+
+Prefer ID, Name and stable CSS selectors.
+
+Use XPath only when necessary.
+`;
+
+    // =====================================================
+    // WEBDRIVERIO TYPESCRIPT
+    // =====================================================
+
+    case "typescript:webdriverio":
+      return `
+=====================================================
+STACK: WEBDRIVERIO + TYPESCRIPT
+=====================================================
+
+Generate a WebdriverIO TypeScript Page Object.
+
+Generate a class exactly named:
+
+${className}
+
+Preferred structure:
+
+export class ${className} {
+  get exampleInput() {
+    return $(
+      '[name="example"]'
+    );
+  }
+
+  get primaryButton() {
+    return $(
+      'button[type="submit"]'
+    );
+  }
+
+  async enterExample(
+    value: string
+  ): Promise<void> {
+    await this.exampleInput
+      .setValue(
+        value
+      );
+  }
+
+  async clickPrimaryButton(): Promise<void> {
+    await this.primaryButton
+      .click();
+  }
+}
+
+Use public selector getters.
+
+Methods must reuse those getters.
+
+Do not recreate selectors inside methods.
+
+Do not invent selector attributes.
+`;
+
+    // =====================================================
+    // WEBDRIVERIO JAVASCRIPT
+    // =====================================================
+
+    case "javascript:webdriverio":
+      return `
+=====================================================
+STACK: WEBDRIVERIO + JAVASCRIPT
+=====================================================
+
+Generate a WebdriverIO JavaScript Page Object.
+
+Generate an exported class exactly named:
+
+${className}
+
+Preferred structure:
+
+export class ${className} {
+  get exampleInput() {
+    return $(
+      '[name="example"]'
+    );
+  }
+
+  get primaryButton() {
+    return $(
+      'button[type="submit"]'
+    );
+  }
+
+  async enterExample(value) {
+    await this.exampleInput
+      .setValue(
+        value
+      );
+  }
+
+  async clickPrimaryButton() {
+    await this.primaryButton
+      .click();
+  }
+}
+
+Use public selector getters.
+
+Do not use TypeScript syntax.
+`;
+
+    // =====================================================
+    // CYPRESS TYPESCRIPT
+    // =====================================================
+
+    case "typescript:cypress":
+      return `
+=====================================================
+STACK: CYPRESS + TYPESCRIPT
+=====================================================
+
+Generate a Cypress TypeScript Page Object.
+
+Generate an exported class exactly named:
+
+${className}
+
+Preferred structure:
+
+export class ${className} {
+  get exampleInput() {
+    return cy.get(
+      '[name="example"]'
+    );
+  }
+
+  get primaryButton() {
+    return cy.get(
+      'button[type="submit"]'
+    );
+  }
+
+  enterExample(
+    value: string
+  ): void {
+    this.exampleInput
+      .clear()
+      .type(
+        value
+      );
+  }
+
+  clickPrimaryButton(): void {
+    this.primaryButton
+      .click();
+  }
+}
+
+Selectors must exist only in the Page Object getters.
+
+Methods must reuse those getters.
+
+Do not put assertions inside the Page Object.
+`;
+
+    // =====================================================
+    // CYPRESS JAVASCRIPT
+    // =====================================================
+
+    case "javascript:cypress":
+      return `
+=====================================================
+STACK: CYPRESS + JAVASCRIPT
+=====================================================
+
+Generate a Cypress JavaScript Page Object.
+
+Generate an exported class exactly named:
+
+${className}
+
+Preferred structure:
+
+export class ${className} {
+  get exampleInput() {
+    return cy.get(
+      '[name="example"]'
+    );
+  }
+
+  get primaryButton() {
+    return cy.get(
+      'button[type="submit"]'
+    );
+  }
+
+  enterExample(value) {
+    this.exampleInput
+      .clear()
+      .type(
+        value
+      );
+  }
+
+  clickPrimaryButton() {
+    this.primaryButton
+      .click();
+  }
+}
+
+Do not use TypeScript syntax.
+
+Do not put assertions inside the Page Object.
+`;
+
+    // =====================================================
+    // MOBILEWRIGHT TYPESCRIPT
+    // =====================================================
+
+    case "typescript:mobilewright":
+      return `
+=====================================================
+STACK: MOBILEWRIGHT + TYPESCRIPT
+=====================================================
 
 Use:
 
 import { android } from "mobilewright";
 
 type MobileScreen =
-  Awaited<ReturnType<typeof android.launch>>["screen"];
+  Awaited<
+    ReturnType<
+      typeof android.launch
+    >
+  >["screen"];
 
-The class should follow this general structure:
+Generate a TypeScript class exactly named:
+
+${className}
+
+Preferred structure:
 
 export class ${className} {
-  readonly screen: MobileScreen;
+  readonly screen:
+    MobileScreen;
 
   readonly exampleInput;
   readonly primaryButton;
 
-  constructor(screen: MobileScreen) {
-    this.screen = screen;
+  constructor(
+    screen:
+      MobileScreen
+  ) {
+    this.screen =
+      screen;
 
     this.exampleInput =
-      screen.getByTestId("example_input");
+      screen.getByTestId(
+        "example_input"
+      );
 
     this.primaryButton =
-      screen.getByTestId("primary_button");
+      screen.getByTestId(
+        "primary_button"
+      );
   }
 
   async enterExample(
     value: string
   ): Promise<void> {
-    await this.exampleInput.fill(value);
+    await this.exampleInput
+      .fill(
+        value
+      );
   }
 
   async tapPrimaryButton(): Promise<void> {
-    await this.primaryButton.tap();
+    await this.primaryButton
+      .tap();
   }
 }
 
-=====================================================
-MOBILEWRIGHT LOCATOR PRIORITY
-=====================================================
+Use only locator information actually present in the supplied mobile DOM.
 
-Use locator information actually available in the supplied mobile DOM.
+Do not invent resource IDs, test IDs,
+accessibility labels, visible text,
+content descriptions or platform attributes.
 
-Prefer when supported:
-
-1. getByTestId()
-2. getByLabel()
-3. getByText()
-
-Do NOT invent:
-
-- resource IDs
-- test IDs
-- accessibility labels
-- visible text
-- content descriptions
-- Android attributes
-- iOS attributes
-
-Every generated locator must be supported by the supplied DOM.
-
-=====================================================
-MOBILEWRIGHT ACTION METHODS
-=====================================================
-
-Use Mobilewright-compatible interactions when supported,
-such as:
-
-tap()
-fill()
-clear()
-
-Create meaningful reusable methods such as:
-
-enterSearchTerm()
-tapSubmitButton()
-tapProfileTab()
-openMenu()
-selectOption()
-
-Do NOT generate Playwright Web-specific code when the
-selected framework is Mobilewright.
+Do not generate Playwright Web code.
 `;
+
+    default:
+      throw new Error(
+        `Unsupported POM stack: ${language} + ${framework}`
+      );
+  }
+}
+
+function getLanguageQualityRules(
+  language: PomLanguage
+): string {
+  switch (language) {
+    case "typescript":
+      return `
+- Generate valid TypeScript.
+- Use explicit useful types.
+- Use async/await correctly.
+- Use Promise<void> where appropriate.
+- Do not use any unless genuinely unavoidable.
+`;
+
+    case "javascript":
+      return `
+- Generate valid modern JavaScript.
+- Do not generate TypeScript type annotations.
+- Use async/await correctly where required.
+`;
+
+    case "python":
+      return `
+- Generate valid Python.
+- Follow normal Python naming conventions.
+- Use type hints where useful.
+- Use snake_case for methods and attributes.
+`;
+
+    case "java":
+      return `
+- Generate valid Java.
+- Use appropriate imports.
+- Use camelCase for methods and fields.
+- Use PascalCase for the class name exactly as supplied.
+`;
+
+    case "csharp":
+      return `
+- Generate valid C#.
+- Use appropriate using statements.
+- Use PascalCase for public members and methods.
+- Use async Task methods where the framework API is asynchronous.
+`;
+
+    default:
+      return "";
+  }
+}
+
+export function getPomPrompt(
+  dom: string,
+  className: string,
+  language: PomLanguage,
+  framework: PomFramework
+): string {
+  const stackLabel =
+    getPomStackLabel(
+      language,
+      framework
+    );
+
+  const stackRules =
+    getStackRules(
+      language,
+      framework,
+      className
+    );
+
+  const languageRules =
+    getLanguageQualityRules(
+      language
+    );
 
   return `
 You are an experienced Senior QA Automation Engineer.
 
 Your task is to analyze the supplied application DOM and generate
-a professional, reusable Page Object Model.
-
-This prompt is UNIVERSAL.
-
-The DOM may represent any application page, screen, component,
-or workflow, including:
-
-- Login
-- Home
-- Dashboard
-- Profile
-- Settings
-- Search
-- Forms
-- Payments
-- Banking
-- Transfers
-- Checkout
-- Administration
-- Navigation
-- Menus
-- Mobile screens
-- Web pages
-- Any other application functionality
-
-Do NOT assume the application is a login page.
-
-Do NOT assume any specific product, company, domain,
-framework structure, or business workflow.
+one professional, reusable Page Object Model.
 
 =====================================================
-PAGE OBJECT CLASS NAME
+SELECTED STACK
 =====================================================
 
-The generated class name MUST be exactly:
+${stackLabel}
+
+=====================================================
+CLASS NAME
+=====================================================
+
+The generated Page Object class name MUST be exactly:
 
 ${className}
 
 Do not rename it.
 
-${frameworkRules}
+${stackRules}
 
 =====================================================
-GENERAL PAGE OBJECT RULES
+UNIVERSAL PAGE OBJECT RULES
 =====================================================
 
 1. Analyze the DOM carefully before generating code.
 
-2. Understand the user-facing purpose of the page or screen.
+2. Understand the user-facing purpose of the supplied page,
+screen, component or module.
 
-3. Generate only locators that are meaningful for automated testing.
+3. Generate only automation elements that are meaningful
+for testing.
 
 Focus primarily on:
 
@@ -277,151 +1057,107 @@ Focus primarily on:
 - Important messages
 - Validation messages
 - Page or screen titles
-- Important images
-- User-facing status information
+- Important status information
 - Business-critical information
 
 4. Do NOT create a locator for every DOM element.
 
-5. Ignore irrelevant implementation elements such as:
+5. Ignore irrelevant implementation elements:
 
 - layout wrappers
-- decorative containers
-- styling-only elements
+- styling-only containers
+- decorative elements
 - SVG internals
 - meaningless spans
 - framework-generated wrappers
+- dynamic framework attributes
 - hidden technical elements
 - irrelevant metadata
 
 =====================================================
-PUBLIC LOCATOR RULES
+DOM IS THE SOURCE OF TRUTH
 =====================================================
 
-6. Important reusable locators MUST be public readonly properties.
+6. Every selector or locator MUST be supported
+by information in the supplied DOM.
 
-GOOD:
-
-readonly usernameField: Locator;
-readonly passwordField: Locator;
-readonly loginButton: Locator;
-
-BAD:
-
-private readonly usernameField: Locator;
-
-BAD:
-
-protected readonly loginButton: Locator;
-
-7. Do NOT declare important test locators as private or protected.
-
-8. Public readonly locators are required because other automation
-layers may need to use them for assertions.
-
-For example, Step Definitions may legitimately use:
-
-await expect(
-  pageObject.usernameField
-).toBeVisible();
-
-9. Do NOT use TypeScript private fields such as:
-
-#usernameField
-
-10. Do NOT force consumers of the Page Object to bypass
-TypeScript access restrictions.
-
-The generated Page Object must never require code such as:
-
-pageObject["usernameField"]
-
-pageObject["usernameField" as keyof typeof pageObject]
-
-as any
-
-11. The Page Object should provide BOTH where useful:
-
-- public readonly locators for assertions
-- reusable public methods for actions
-
-Example:
-
-readonly searchInput: Locator;
-
-async enterSearchTerm(
-  value: string
-): Promise<void> {
-  await this.searchInput.fill(value);
-}
-
-=====================================================
-LOCATOR NAMING
-=====================================================
-
-12. Locator names must be:
-
-- descriptive
-- camelCase
-- based on user-visible purpose
-- understandable by another QA Engineer
-
-GOOD:
-
-usernameField
-passwordField
-loginButton
-profileTab
-searchInput
-submitButton
-validationMessage
-accountBalance
-transferAmountField
-beneficiaryDropdown
-
-BAD:
-
-div1
-input2
-element123
-buttonElement
-locatorA
-fieldX
-
-13. Avoid technical names when a business/user-facing name exists.
-
-=====================================================
-LOCATOR ACCURACY
-=====================================================
-
-14. Do NOT invent locators.
-
-Every locator must be supported by information in the supplied DOM.
-
-15. Do NOT invent:
+7. Do NOT invent:
 
 - test IDs
+- IDs
+- names
 - labels
 - placeholders
 - roles
 - text
 - CSS selectors
-- IDs
+- XPath values
 - resource IDs
 - accessibility labels
+- content descriptions
 
-16. If the DOM does not provide enough information for a reliable
-locator, omit that locator rather than inventing one.
+8. If the DOM does not provide enough information
+for a reliable locator, omit it.
 
-17. Prefer stable selectors over implementation-specific selectors.
+9. Never guess a selector merely because it would
+be convenient for automation.
 
-18. Avoid duplicate locators representing the same element.
+10. Avoid fragile selectors based on:
+
+- generated CSS classes
+- deep DOM hierarchy
+- nth-child
+- nth-of-type
+- random framework attributes
+- dynamic IDs
+- positional selectors
+
+11. XPath should be used only when the selected
+framework supports it and no better stable selector exists.
 
 =====================================================
-ACTION METHOD RULES
+LOCATOR DESIGN
 =====================================================
 
-19. Create reusable public methods for meaningful user actions.
+12. Locator names must be descriptive and based on
+the user-facing purpose.
+
+GOOD examples:
+
+usernameField
+passwordField
+loginButton
+searchInput
+profileTab
+submitButton
+validationMessage
+accountBalance
+beneficiaryDropdown
+
+BAD examples:
+
+div1
+input2
+element123
+locatorA
+buttonElement
+fieldX
+
+13. Avoid duplicate locators representing the same element.
+
+14. Important reusable locators must remain accessible
+to the automation layer.
+
+15. Do not hide important locators behind private access
+when Step Definitions or tests may reasonably need them
+for assertions.
+
+=====================================================
+ACTION METHODS
+=====================================================
+
+16. Create reusable methods only for meaningful
+user actions supported by the DOM.
 
 Examples:
 
@@ -434,221 +1170,136 @@ enterTransferAmount()
 search()
 openMenu()
 
-20. Action methods MUST use locators already declared in the class.
+17. Action methods MUST reuse already declared
+locators, selector properties or selector getters.
 
-GOOD:
+18. Do NOT recreate selectors inside action methods.
 
-async clickSubmit(): Promise<void> {
-  await this.submitButton.click();
-}
+19. Do NOT generate methods for functionality
+that is not supported by the DOM.
 
-BAD:
+20. Do NOT create meaningless wrapper methods
+just to increase code size.
 
-async clickSubmit(): Promise<void> {
-  await this.page
-    .getByRole("button", { name: "Submit" })
-    .click();
-}
+21. A useful combined workflow method may be added
+only when it represents an obvious user action
+supported by the supplied DOM.
 
-The locator should be declared once and reused.
-
-21. Do NOT duplicate locator definitions inside methods.
-
-22. Do NOT create methods for actions that are not supported by the DOM.
-
-23. Do NOT create meaningless methods merely to increase code size.
-
-24. Use clear method parameter types.
-
-Example:
-
-async enterAmount(
-  amount: string
-): Promise<void> {
-  await this.amountField.fill(amount);
-}
+For example, on a login form it may be reasonable
+to provide a login(username, password) method
+if username, password and submit controls are
+all clearly present.
 
 =====================================================
 ASSERTION RESPONSIBILITY
 =====================================================
 
-25. Do NOT normally put assertions inside the Page Object.
+22. Do NOT put test assertions inside the Page Object.
 
-The Page Object should expose locators and actions.
+The Page Object should expose:
 
-Assertions should normally remain in:
+- selectors / locators
+- reusable user actions
+
+Assertions belong in:
 
 - tests
-- step definitions
+- Step Definitions
 - assertion/helper layers
 
-For example, expose:
-
-readonly errorMessage: Locator;
-
-instead of creating:
-
-async verifyErrorMessage() {
-  expect(...);
-}
-
-unless there is a strong architectural reason.
-
 =====================================================
-PAGE / SCREEN PROPERTY
+NO INVENTED BEHAVIOR
 =====================================================
 
-26. For Playwright, expose the Page publicly:
+23. Do NOT assume:
 
-readonly page: Page;
-
-27. For Mobilewright, expose the screen publicly when useful:
-
-readonly screen: MobileScreen;
-
-28. Do NOT make page or screen private if doing so prevents
-reasonable reuse by the automation layer.
-
-=====================================================
-UNIVERSAL DESIGN
-=====================================================
-
-29. The generated Page Object must reflect ONLY the supplied DOM.
-
-30. Do not assume:
-
-- Login behavior
+- Login success behavior
 - Redirect behavior
 - Authentication rules
 - Backend responses
-- API responses
+- API behavior
 - Database behavior
 - Error messages
 - Success messages
+- Permissions
+- Roles
 - Business rules
-- Other pages
+- Navigation destinations
+- URLs
 
-unless supported by the supplied DOM.
+unless directly supported by the supplied input.
 
-31. Do not hardcode product-specific behavior that is not present
-in the input.
+24. Do NOT invent URLs.
 
-32. Do not invent URLs.
-
-33. Do not invent navigation destinations.
-
-34. Do not invent form submission behavior.
+25. Do NOT generate navigation methods that require
+an invented destination.
 
 =====================================================
 DO NOT GENERATE
 =====================================================
 
-35. Do NOT generate test cases.
+26. Do NOT generate test cases.
 
-36. Do NOT generate BDD scenarios.
+27. Do NOT generate BDD scenarios.
 
-37. Do NOT generate step definitions.
+28. Do NOT generate Step Definitions.
 
-38. Do NOT generate fixtures.
+29. Do NOT generate fixtures.
 
-39. Do NOT generate configuration files.
+30. Do NOT generate configuration files.
 
-40. Do NOT generate sample tests.
+31. Do NOT generate sample tests.
 
-41. Do NOT generate explanation text.
-
-The output must contain only the requested Page Object TypeScript file.
+32. Do NOT generate explanation text.
 
 =====================================================
-TYPESCRIPT QUALITY
+LANGUAGE QUALITY
 =====================================================
 
-42. Generate valid TypeScript.
-
-43. Use async / await correctly.
-
-44. Use Promise<void> for action methods where appropriate.
-
-45. Avoid unnecessary comments.
-
-46. Avoid unused imports.
-
-47. Avoid unused locators.
-
-48. Avoid unused class properties.
-
-49. Avoid duplicate methods.
-
-50. Keep formatting clean and professional.
-
-51. Use consistent quotation style.
-
-52. Ensure the generated code should compile once placed
-into an appropriate project.
+${languageRules}
 
 =====================================================
 STEP-DEFINITION COMPATIBILITY
 =====================================================
 
-53. The Page Object may later be consumed by BDD Step Definitions.
+The Page Object may later be consumed by BDD
+Step Definitions.
 
 Therefore:
 
-- important locators must be public readonly
-- action methods must be public
-- method names must be descriptive
-- locator names must be descriptive
-- private/protected locators should not be used
-- selectors must exist only inside the Page Object
-
-54. The Page Object should allow Step Definitions to use:
-
-ACTIONS:
-
-await pageObject.enterValue(value);
-
-await pageObject.clickSubmit();
-
-ASSERTIONS:
-
-await expect(
-  pageObject.submitButton
-).toBeVisible();
-
-55. Do NOT force Step Definitions to create their own selectors.
-
-56. Do NOT force Step Definitions to bypass private properties.
+- important automation elements must remain reusable
+- action methods must be accessible
+- selectors must remain inside the Page Object
+- method names must clearly express user actions
+- Step Definitions should not need to create selectors
+- Step Definitions should not need unsafe access workarounds
 
 =====================================================
 FINAL QUALITY CHECK
 =====================================================
 
-Before returning the result, verify:
+Before returning the code verify:
 
-- The class name is exactly ${className}.
-- The selected framework is respected.
-- Important locators are public readonly.
-- No important locator is private or protected.
-- All locators are supported by the DOM.
-- No selector is invented.
-- No duplicate locator exists.
-- Action methods reuse declared locators.
-- No locator is recreated inside methods.
-- No unnecessary assertions exist in the Page Object.
-- No test code exists.
-- No BDD code exists.
-- No Step Definition code exists.
-- No unused imports exist.
-- No unused properties exist.
-- TypeScript syntax is valid.
-- The output is maintainable.
-- The output can later be consumed cleanly by Step Definitions.
+- class name is exactly ${className}
+- selected stack is exactly ${stackLabel}
+- every selector is supported by the DOM
+- no selector is invented
+- no duplicate selector exists
+- action methods reuse declared selectors
+- no unnecessary assertions exist
+- no test code exists
+- no BDD code exists
+- no Step Definition code exists
+- no unused imports exist
+- no duplicate methods exist
+- syntax is valid for the selected language
+- output is maintainable
 
 =====================================================
 OUTPUT RULES
 =====================================================
 
-Return ONLY valid TypeScript source code.
+Return ONLY source code.
 
 Do NOT return Markdown.
 
@@ -658,14 +1309,167 @@ Do NOT include explanations before the code.
 
 Do NOT include explanations after the code.
 
-The generated code must be ready to save directly as:
-
-${className}.ts
-
 =====================================================
 APPLICATION DOM
 =====================================================
 
 ${dom}
+`;
+}
+
+export function getPomReviewerPrompt(
+  dom: string,
+  generatedCode: string,
+  className: string,
+  language: PomLanguage,
+  framework: PomFramework
+): string {
+  const stackLabel =
+    getPomStackLabel(
+      language,
+      framework
+    );
+
+  const stackRules =
+    getStackRules(
+      language,
+      framework,
+      className
+    );
+
+  const languageRules =
+    getLanguageQualityRules(
+      language
+    );
+
+  return `
+You are an experienced Senior QA Automation Engineer.
+
+Review and improve a Page Object Model generated
+by another AI QA Engineer.
+
+Return the FINAL production-quality Page Object only.
+
+=====================================================
+SELECTED STACK
+=====================================================
+
+${stackLabel}
+
+=====================================================
+CLASS NAME
+=====================================================
+
+Preserve this class name exactly:
+
+${className}
+
+${stackRules}
+
+=====================================================
+REVIEW RESPONSIBILITIES
+=====================================================
+
+1. Preserve the selected programming language.
+
+2. Preserve the selected automation framework.
+
+3. Preserve the class name exactly.
+
+4. Fix invalid syntax.
+
+5. Remove duplicate locators.
+
+6. Remove unused locators.
+
+7. Remove unnecessary imports.
+
+8. Remove duplicate methods.
+
+9. Improve locator stability.
+
+10. Prefer meaningful user-facing selectors.
+
+11. Every selector MUST be supported by the supplied DOM.
+
+12. Do NOT invent selectors.
+
+13. Do NOT invent functionality.
+
+14. Avoid fragile selectors.
+
+15. Keep locator names descriptive.
+
+16. Keep action methods reusable and user-focused.
+
+17. Action methods MUST reuse selectors already
+declared in the Page Object.
+
+18. Do NOT recreate selectors inside methods.
+
+19. Important reusable automation elements must
+remain accessible to tests and Step Definitions.
+
+20. Do NOT add assertions to the Page Object.
+
+21. Do NOT generate tests.
+
+22. Do NOT generate BDD scenarios.
+
+23. Do NOT generate Step Definitions.
+
+24. Do NOT invent URLs.
+
+25. Do NOT invent redirect behavior.
+
+26. Do NOT invent error or success behavior.
+
+=====================================================
+LANGUAGE QUALITY
+=====================================================
+
+${languageRules}
+
+=====================================================
+FINAL CHECK
+=====================================================
+
+Verify:
+
+- class name is exactly ${className}
+- stack is exactly ${stackLabel}
+- selectors exist in the DOM
+- no selector is invented
+- no duplicate locator exists
+- no unused locator exists
+- methods reuse declared selectors
+- no unnecessary assertions exist
+- no test code exists
+- syntax is valid
+- code is maintainable
+
+=====================================================
+OUTPUT RULES
+=====================================================
+
+Return ONLY source code.
+
+Do NOT return Markdown.
+
+Do NOT use triple backticks.
+
+Do NOT include explanations.
+
+=====================================================
+ORIGINAL DOM
+=====================================================
+
+${dom}
+
+=====================================================
+GENERATED PAGE OBJECT
+=====================================================
+
+${generatedCode}
 `;
 }

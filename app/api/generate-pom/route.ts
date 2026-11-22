@@ -1,9 +1,19 @@
-import { NextResponse } from "next/server";
+import {
+  NextResponse,
+} from "next/server";
 
 import {
   getPomPrompt,
-  PomFramework,
+  getPomReviewerPrompt,
 } from "@/lib/prompts/pomPrompt";
+
+import {
+  getPomFileExtension,
+  getPomStackLabel,
+  isSupportedPomStack,
+  type PomFramework,
+  type PomLanguage,
+} from "@/lib/pomConfig";
 
 // =====================================================
 // ALLOWED GROQ MODELS
@@ -14,9 +24,49 @@ const ALLOWED_MODELS = [
   "openai/gpt-oss-120b",
 ] as const;
 
-function isAllowedModel(model: string): boolean {
+function isAllowedModel(
+  model: string
+): boolean {
   return ALLOWED_MODELS.includes(
-    model as (typeof ALLOWED_MODELS)[number]
+    model as (
+      typeof ALLOWED_MODELS
+    )[number]
+  );
+}
+
+// =====================================================
+// VALID LANGUAGE
+// =====================================================
+
+function isPomLanguage(
+  value: unknown
+): value is PomLanguage {
+  return [
+    "typescript",
+    "javascript",
+    "python",
+    "java",
+    "csharp",
+  ].includes(
+    value as string
+  );
+}
+
+// =====================================================
+// VALID FRAMEWORK
+// =====================================================
+
+function isPomFramework(
+  value: unknown
+): value is PomFramework {
+  return [
+    "playwright",
+    "selenium",
+    "webdriverio",
+    "cypress",
+    "mobilewright",
+  ].includes(
+    value as string
   );
 }
 
@@ -24,13 +74,19 @@ function isAllowedModel(model: string): boolean {
 // CLEAN MODEL CODE
 // =====================================================
 
-function cleanCode(content: string): string {
+function cleanCode(
+  content: string
+): string {
   return content
     .trim()
-    .replace(/^```typescript\s*/i, "")
-    .replace(/^```ts\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/, "")
+    .replace(
+      /^```(?:typescript|ts|javascript|js|python|py|java|csharp|cs|c#)?\s*/i,
+      ""
+    )
+    .replace(
+      /\s*```$/,
+      ""
+    )
     .trim();
 }
 
@@ -43,36 +99,49 @@ async function callGroq(
   model: string,
   prompt: string
 ): Promise<string> {
-  const response = await fetch(
-    "https://api.groq.com/openai/v1/chat/completions",
-    {
-      method: "POST",
+  const response =
+    await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method:
+          "POST",
 
-      headers: {
-        Authorization: `Bearer ${apiKey.trim()}`,
-        "Content-Type": "application/json",
-      },
+        headers: {
+          Authorization:
+            `Bearer ${apiKey.trim()}`,
 
-      body: JSON.stringify({
-        model,
+          "Content-Type":
+            "application/json",
+        },
 
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+        body:
+          JSON.stringify({
+            model,
 
-        temperature: 0.2,
+            messages: [
+              {
+                role:
+                  "user",
 
-        reasoning_effort: "low",
+                content:
+                  prompt,
+              },
+            ],
 
-        include_reasoning: false,
+            temperature:
+              0.2,
 
-        max_completion_tokens: 8192,
-      }),
-    }
-  );
+            reasoning_effort:
+              "low",
+
+            include_reasoning:
+              false,
+
+            max_completion_tokens:
+              8192,
+          }),
+      }
+    );
 
   if (!response.ok) {
     const errorText =
@@ -85,21 +154,29 @@ async function callGroq(
     );
 
     if (
-      response.status === 401 ||
-      response.status === 403
+      response.status ===
+        401 ||
+      response.status ===
+        403
     ) {
       throw new Error(
         "Invalid or unauthorized Groq API key."
       );
     }
 
-    if (response.status === 429) {
+    if (
+      response.status ===
+      429
+    ) {
       throw new Error(
         "Groq rate limit reached. Please wait and try again."
       );
     }
 
-    if (response.status === 413) {
+    if (
+      response.status ===
+      413
+    ) {
       throw new Error(
         "The uploaded DOM is too large for the Groq request."
       );
@@ -119,7 +196,8 @@ async function callGroq(
 
   if (
     !content ||
-    typeof content !== "string"
+    typeof content !==
+      "string"
   ) {
     throw new Error(
       `Groq model "${model}" returned an empty response.`
@@ -133,7 +211,9 @@ async function callGroq(
 // POST /api/generate-pom
 // =====================================================
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request
+) {
   try {
     const body =
       await request.json();
@@ -141,6 +221,7 @@ export async function POST(request: Request) {
     const {
       dom,
       className,
+      language,
       framework,
       apiKey,
       generatorModel,
@@ -153,7 +234,8 @@ export async function POST(request: Request) {
 
     if (
       !dom ||
-      typeof dom !== "string"
+      typeof dom !==
+        "string"
     ) {
       return NextResponse.json(
         {
@@ -172,7 +254,9 @@ export async function POST(request: Request) {
 
     if (
       !className ||
-      typeof className !== "string"
+      typeof className !==
+        "string" ||
+      !className.trim()
     ) {
       return NextResponse.json(
         {
@@ -186,17 +270,31 @@ export async function POST(request: Request) {
     }
 
     // =================================================
+    // VALIDATE LANGUAGE
+    // =================================================
+
+    if (
+      !isPomLanguage(
+        language
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid programming language.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    // =================================================
     // VALIDATE FRAMEWORK
     // =================================================
 
-    const allowedFrameworks:
-      PomFramework[] = [
-        "playwright",
-        "mobilewright",
-      ];
-
     if (
-      !allowedFrameworks.includes(
+      !isPomFramework(
         framework
       )
     ) {
@@ -212,12 +310,34 @@ export async function POST(request: Request) {
     }
 
     // =================================================
+    // VALIDATE STACK
+    // =================================================
+
+    if (
+      !isSupportedPomStack(
+        language,
+        framework
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "The selected language and framework combination is not supported.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    // =================================================
     // VALIDATE GROQ API KEY
     // =================================================
 
     if (
       !apiKey ||
-      typeof apiKey !== "string" ||
+      typeof apiKey !==
+        "string" ||
       !apiKey.trim()
     ) {
       return NextResponse.json(
@@ -232,13 +352,16 @@ export async function POST(request: Request) {
     }
 
     // =================================================
-    // VALIDATE GENERATOR MODEL
+    // VALIDATE GENERATOR
     // =================================================
 
     if (
       !generatorModel ||
-      typeof generatorModel !== "string" ||
-      !isAllowedModel(generatorModel)
+      typeof generatorModel !==
+        "string" ||
+      !isAllowedModel(
+        generatorModel
+      )
     ) {
       return NextResponse.json(
         {
@@ -252,13 +375,16 @@ export async function POST(request: Request) {
     }
 
     // =================================================
-    // VALIDATE REVIEWER MODEL
+    // VALIDATE REVIEWER
     // =================================================
 
     if (
       !reviewerModel ||
-      typeof reviewerModel !== "string" ||
-      !isAllowedModel(reviewerModel)
+      typeof reviewerModel !==
+        "string" ||
+      !isAllowedModel(
+        reviewerModel
+      )
     ) {
       return NextResponse.json(
         {
@@ -271,14 +397,38 @@ export async function POST(request: Request) {
       );
     }
 
+    const safeClassName =
+      className.trim();
+
+    const stackLabel =
+      getPomStackLabel(
+        language,
+        framework
+      );
+
+    const fileExtension =
+      getPomFileExtension(
+        language
+      );
+
     console.log(
       "Generating POM:",
-      className
+      safeClassName
+    );
+
+    console.log(
+      "Language:",
+      language
     );
 
     console.log(
       "Framework:",
       framework
+    );
+
+    console.log(
+      "Stack:",
+      stackLabel
     );
 
     console.log(
@@ -305,7 +455,8 @@ export async function POST(request: Request) {
     const generationPrompt =
       getPomPrompt(
         dom,
-        className,
+        safeClassName,
+        language,
         framework
       );
 
@@ -325,129 +476,14 @@ export async function POST(request: Request) {
     // 2. REVIEWER
     // =====================================================
 
-    const reviewerPrompt = `
-You are an experienced Senior QA Automation Engineer.
-
-Review the generated Page Object Model below.
-
-Your job is to return the FINAL improved TypeScript
-Page Object Model.
-
-=====================================================
-FRAMEWORK
-=====================================================
-
-${framework}
-
-=====================================================
-CLASS NAME
-=====================================================
-
-${className}
-
-=====================================================
-REVIEW RULES
-=====================================================
-
-1. Preserve the selected framework.
-
-2. Preserve the class name exactly:
-
-${className}
-
-3. Fix invalid TypeScript.
-
-4. Remove duplicate locators.
-
-5. Remove unused locators.
-
-6. Remove unnecessary imports.
-
-7. Improve locator stability.
-
-8. Prefer meaningful user-facing locators.
-
-9. Do not invent selectors that are not supported
-   by the supplied DOM.
-
-10. Do not invent functionality.
-
-11. Avoid fragile selectors.
-
-12. Keep locator names descriptive and camelCase.
-
-13. Keep methods reusable and user-focused.
-
-14. Action methods must reuse locators already declared
-    in the Page Object.
-
-15. Do not recreate selectors inside methods.
-
-16. Important reusable locators MUST remain public readonly.
-
-GOOD:
-
-readonly usernameInput: Locator;
-
-BAD:
-
-private readonly usernameInput: Locator;
-
-BAD:
-
-protected readonly usernameInput: Locator;
-
-17. Public locators may later be used by Step Definitions
-    for Playwright assertions.
-
-18. Do not introduce private or protected locators.
-
-19. Do not use #private TypeScript fields.
-
-20. Do not put test assertions inside the Page Object.
-
-21. Do not generate tests.
-
-22. Do not generate BDD scenarios.
-
-23. Do not generate Step Definitions.
-
-24. Do not invent URLs.
-
-25. Return ONLY TypeScript source code.
-
-26. Do not return Markdown.
-
-27. Do not use triple backticks.
-
-=====================================================
-FINAL CHECK
-=====================================================
-
-Before returning the code verify:
-
-- class name is exactly ${className}
-- framework is ${framework}
-- important locators are public readonly
-- selectors are supported by the DOM
-- no duplicate locators exist
-- methods reuse declared locators
-- no unnecessary assertions exist
-- no test code exists
-- TypeScript is valid
-
-=====================================================
-ORIGINAL DOM
-=====================================================
-
-${dom}
-
-=====================================================
-GENERATED PAGE OBJECT
-=====================================================
-
-${generatedCode}
-`;
+    const reviewerPrompt =
+      getPomReviewerPrompt(
+        dom,
+        generatedCode,
+        safeClassName,
+        language,
+        framework
+      );
 
     const reviewedContent =
       await callGroq(
@@ -466,11 +502,19 @@ ${generatedCode}
     // =====================================================
 
     return NextResponse.json({
-      success: true,
+      success:
+        true,
 
-      className,
+      className:
+        safeClassName,
+
+      language,
 
       framework,
+
+      stackLabel,
+
+      fileExtension,
 
       model:
         `${generatorModel} + ${reviewerModel}`,
@@ -480,6 +524,7 @@ ${generatedCode}
           "groq",
 
         generatorModel,
+
         reviewerModel,
       },
 
@@ -504,7 +549,8 @@ ${generatedCode}
           message,
       },
       {
-        status: 500,
+        status:
+          500,
       }
     );
   }

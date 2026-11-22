@@ -1,305 +1,507 @@
 "use client";
 
-import { useState } from "react";
-import { cleanDom } from "@/lib/domCleaner";
+import {
+  useState,
+} from "react";
 
-type PomFramework =
-  | "playwright"
-  | "mobilewright";
+import {
+  cleanDom,
+} from "@/lib/domCleaner";
+
+import {
+  LANGUAGE_OPTIONS,
+  getFrameworkLabel,
+  getFrameworksForLanguage,
+  getPomFileExtension,
+  getPomStackLabel,
+  type PomFramework,
+  type PomLanguage,
+} from "@/lib/pomConfig";
 
 type PomResult = {
   success: boolean;
+
   className: string;
-  framework: PomFramework;
-  model: string;
-  code: string;
+
+  language:
+    PomLanguage;
+
+  framework:
+    PomFramework;
+
+  stackLabel:
+    string;
+
+  fileExtension:
+    string;
+
+  model:
+    string;
+
+  code:
+    string;
 };
 
 export default function PomPage() {
-  const [fileName, setFileName] =
+  const [
+    fileName,
+    setFileName,
+  ] =
     useState("");
 
-  const [domContent, setDomContent] =
+  const [
+    domContent,
+    setDomContent,
+  ] =
     useState("");
 
-  const [className, setClassName] =
-    useState("PageExample");
+  const [
+    className,
+    setClassName,
+  ] =
+    useState(
+      "PageExample"
+    );
 
-  const [framework, setFramework] =
-    useState<PomFramework>("playwright");
+  const [
+    language,
+    setLanguage,
+  ] =
+    useState<PomLanguage>(
+      "typescript"
+    );
 
-  const [result, setResult] =
-    useState<PomResult | null>(null);
+  const [
+    framework,
+    setFramework,
+  ] =
+    useState<PomFramework>(
+      "playwright"
+    );
 
-  const [isGenerating, setIsGenerating] =
+  const [
+    result,
+    setResult,
+  ] =
+    useState<PomResult | null>(
+      null
+    );
+
+  const [
+    isGenerating,
+    setIsGenerating,
+  ] =
     useState(false);
 
-  const [copied, setCopied] =
+  const [
+    copied,
+    setCopied,
+  ] =
     useState(false);
 
-  const [error, setError] =
+  const [
+    error,
+    setError,
+  ] =
     useState("");
+
+  const availableFrameworks =
+    getFrameworksForLanguage(
+      language
+    );
 
   // =====================================================
   // UPLOAD DOM
   // =====================================================
 
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file =
-      event.target.files?.[0];
+  const handleFileUpload =
+    async (
+      event:
+        React.ChangeEvent<HTMLInputElement>
+    ) => {
+      const file =
+        event.target
+          .files?.[0];
 
-    if (!file) {
-      return;
-    }
+      if (!file) {
+        return;
+      }
 
-    try {
-      const content =
-        await file.text();
+      try {
+        const content =
+          await file.text();
 
-      const cleaned =
-        cleanDom(content);
+        const cleaned =
+          cleanDom(
+            content
+          );
 
-      setFileName(
-        file.name
+        setFileName(
+          file.name
+        );
+
+        setDomContent(
+          cleaned
+        );
+
+        setResult(
+          null
+        );
+
+        setCopied(
+          false
+        );
+
+        setError("");
+
+      } catch (err) {
+        console.error(
+          "File reading error:",
+          err
+        );
+
+        setError(
+          "Unable to read the selected file."
+        );
+      }
+    };
+
+  // =====================================================
+  // LANGUAGE CHANGE
+  // =====================================================
+
+  const handleLanguageChange =
+    (
+      nextLanguage:
+        PomLanguage
+    ) => {
+      const frameworks =
+        getFrameworksForLanguage(
+          nextLanguage
+        );
+
+      setLanguage(
+        nextLanguage
       );
 
-      setDomContent(
-        cleaned
+      if (
+        !frameworks.includes(
+          framework
+        )
+      ) {
+        setFramework(
+          frameworks[0]
+        );
+      }
+
+      setResult(
+        null
       );
 
-      setResult(null);
-      setCopied(false);
+      setCopied(
+        false
+      );
+
       setError("");
+    };
 
-    } catch (err) {
-      console.error(
-        "File reading error:",
-        err
+  // =====================================================
+  // FRAMEWORK CHANGE
+  // =====================================================
+
+  const handleFrameworkChange =
+    (
+      nextFramework:
+        PomFramework
+    ) => {
+      setFramework(
+        nextFramework
       );
 
-      setError(
-        "Unable to read the selected file."
+      setResult(
+        null
       );
-    }
-  };
+
+      setCopied(
+        false
+      );
+
+      setError("");
+    };
 
   // =====================================================
   // GENERATE POM
   // =====================================================
 
-  const generatePom = async () => {
-    if (!domContent) {
-      setError(
-        "Please upload a DOM / HTML file."
-      );
-
-      return;
-    }
-
-    if (!className.trim()) {
-      setError(
-        "Please enter a Page Object class name."
-      );
-
-      return;
-    }
-
-    // =================================================
-    // LOAD GROQ SETTINGS
-    // =================================================
-
-    const apiKey =
-      sessionStorage.getItem(
-        "groqApiKey"
-      );
-
-    const generatorModel =
-      localStorage.getItem(
-        "generatorModel"
-      ) ||
-      "openai/gpt-oss-20b";
-
-    const reviewerModel =
-      localStorage.getItem(
-        "reviewerModel"
-      ) ||
-      "openai/gpt-oss-120b";
-
-    if (!apiKey) {
-      setError(
-        "Groq API key is not configured. Please configure it in Settings."
-      );
-
-      return;
-    }
-
-    try {
-      setIsGenerating(true);
-      setError("");
-      setResult(null);
-      setCopied(false);
-
-      const response =
-        await fetch(
-          "/api/generate-pom",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              dom:
-                domContent,
-
-              className:
-                className.trim(),
-
-              framework,
-
-              apiKey,
-              generatorModel,
-              reviewerModel,
-            }),
-          }
+  const generatePom =
+    async () => {
+      if (!domContent) {
+        setError(
+          "Please upload a DOM / HTML file."
         );
 
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            "Failed to generate Page Object Model."
-        );
+        return;
       }
-
-      setResult(
-        data
-      );
-
-    } catch (err) {
-      console.error(
-        "POM generation error:",
-        err
-      );
 
       if (
-        err instanceof Error
+        !className.trim()
       ) {
         setError(
-          err.message
+          "Please enter a Page Object class name."
         );
-      } else {
-        setError(
-          "Something went wrong."
-        );
+
+        return;
       }
 
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+      const apiKey =
+        sessionStorage.getItem(
+          "groqApiKey"
+        );
+
+      const generatorModel =
+        localStorage.getItem(
+          "generatorModel"
+        ) ||
+        "openai/gpt-oss-20b";
+
+      const reviewerModel =
+        localStorage.getItem(
+          "reviewerModel"
+        ) ||
+        "openai/gpt-oss-120b";
+
+      if (!apiKey) {
+        setError(
+          "Groq API key is not configured. Please configure it in Settings."
+        );
+
+        return;
+      }
+
+      try {
+        setIsGenerating(
+          true
+        );
+
+        setError("");
+
+        setResult(
+          null
+        );
+
+        setCopied(
+          false
+        );
+
+        const response =
+          await fetch(
+            "/api/generate-pom",
+            {
+              method:
+                "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  dom:
+                    domContent,
+
+                  className:
+                    className.trim(),
+
+                  language,
+
+                  framework,
+
+                  apiKey,
+
+                  generatorModel,
+
+                  reviewerModel,
+                }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok
+        ) {
+          throw new Error(
+            data.error ||
+              "Failed to generate Page Object Model."
+          );
+        }
+
+        setResult(
+          data
+        );
+
+      } catch (err) {
+        console.error(
+          "POM generation error:",
+          err
+        );
+
+        if (
+          err instanceof Error
+        ) {
+          setError(
+            err.message
+          );
+        } else {
+          setError(
+            "Something went wrong."
+          );
+        }
+
+      } finally {
+        setIsGenerating(
+          false
+        );
+      }
+    };
 
   // =====================================================
   // COPY CODE
   // =====================================================
 
-  const copyCode = async () => {
-    if (!result?.code) {
-      return;
-    }
+  const copyCode =
+    async () => {
+      if (
+        !result?.code
+      ) {
+        return;
+      }
 
-    try {
-      await navigator.clipboard.writeText(
-        result.code
-      );
+      try {
+        await navigator
+          .clipboard
+          .writeText(
+            result.code
+          );
 
-      setCopied(true);
+        setCopied(
+          true
+        );
 
-      setTimeout(() => {
-        setCopied(false);
-      }, 2000);
+        setTimeout(
+          () => {
+            setCopied(
+              false
+            );
+          },
+          2000
+        );
 
-    } catch (err) {
-      console.error(
-        "Copy failed:",
-        err
-      );
+      } catch (err) {
+        console.error(
+          "Copy failed:",
+          err
+        );
 
-      setError(
-        "Unable to copy generated code."
-      );
-    }
-  };
+        setError(
+          "Unable to copy generated code."
+        );
+      }
+    };
 
   // =====================================================
-  // DOWNLOAD TXT FILE
+  // DOWNLOAD SOURCE FILE
   // =====================================================
 
-  const downloadCode = () => {
-    if (!result?.code) {
-      return;
-    }
+  const downloadCode =
+    () => {
+      if (
+        !result?.code
+      ) {
+        return;
+      }
 
-    try {
-      const fileName =
-        `${result.className}.txt`;
+      try {
+        const extension =
+          result.fileExtension ||
+          getPomFileExtension(
+            result.language
+          );
 
-      const blob =
-        new Blob(
-          [result.code],
-          {
-            type:
-              "text/plain;charset=utf-8",
-          }
+        const outputFileName =
+          `${result.className}.${extension}`;
+
+        const blob =
+          new Blob(
+            [
+              result.code,
+            ],
+            {
+              type:
+                "text/plain;charset=utf-8",
+            }
+          );
+
+        const url =
+          URL.createObjectURL(
+            blob
+          );
+
+        const link =
+          document.createElement(
+            "a"
+          );
+
+        link.href =
+          url;
+
+        link.download =
+          outputFileName;
+
+        document.body
+          .appendChild(
+            link
+          );
+
+        link.click();
+
+        document.body
+          .removeChild(
+            link
+          );
+
+        URL.revokeObjectURL(
+          url
         );
 
-      const url =
-        URL.createObjectURL(
-          blob
+      } catch (err) {
+        console.error(
+          "Download failed:",
+          err
         );
 
-      const link =
-        document.createElement(
-          "a"
+        setError(
+          "Unable to download the generated Page Object."
         );
+      }
+    };
 
-      link.href =
-        url;
+  // =====================================================
+  // CURRENT FILE EXTENSION
+  // =====================================================
 
-      link.download =
-        fileName;
+  const selectedExtension =
+    getPomFileExtension(
+      language
+    );
 
-      document.body.appendChild(
-        link
-      );
-
-      link.click();
-
-      document.body.removeChild(
-        link
-      );
-
-      URL.revokeObjectURL(
-        url
-      );
-
-    } catch (error) {
-      console.error(
-        "Download failed:",
-        error
-      );
-
-      setError(
-        "Unable to download the generated Page Object."
-      );
-    }
-  };
+  const selectedStack =
+    getPomStackLabel(
+      language,
+      framework
+    );
 
   // =====================================================
   // UI
@@ -310,7 +512,9 @@ export default function PomPage() {
 
       <div className="mx-auto max-w-7xl">
 
-        {/* HEADER */}
+        {/* =====================================================
+            HEADER
+        ===================================================== */}
 
         <div className="mb-8 rounded-2xl bg-white p-8 shadow">
 
@@ -318,9 +522,10 @@ export default function PomPage() {
             Create Page Object Model
           </h1>
 
-          <p className="mt-2 text-gray-600">
-            Upload application DOM / HTML and generate a
-            reusable automation Page Object Model.
+          <p className="mt-2 max-w-3xl text-gray-600">
+            Upload application DOM / HTML and generate
+            reusable Page Object Models for multiple
+            automation frameworks and programming languages.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -330,18 +535,20 @@ export default function PomPage() {
             </span>
 
             <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
-              Playwright
+              5 Languages
             </span>
 
             <span className="rounded-full bg-purple-50 px-3 py-1 text-sm font-medium text-purple-700">
-              Mobilewright
+              Multiple Frameworks
             </span>
 
           </div>
 
         </div>
 
-        {/* GENERATOR */}
+        {/* =====================================================
+            GENERATOR
+        ===================================================== */}
 
         <div className="rounded-2xl bg-white p-8 shadow">
 
@@ -365,13 +572,14 @@ export default function PomPage() {
               </span>
 
               <span className="mt-2 text-sm text-gray-500">
-                .html or .txt
+                .html, .htm or .txt
               </span>
 
               <input
                 type="file"
                 accept=".html,.htm,.txt"
                 className="hidden"
+
                 onChange={
                   handleFileUpload
                 }
@@ -380,25 +588,36 @@ export default function PomPage() {
             </label>
 
             {fileName && (
+
               <div className="mt-4 rounded-lg bg-blue-50 p-4 text-blue-700">
+
                 Selected file:{" "}
+
                 <strong>
                   {fileName}
                 </strong>
+
               </div>
+
             )}
 
             {domContent && (
+
               <div className="mt-4 rounded-lg bg-green-50 p-4 text-green-700">
+
                 ✓ DOM successfully loaded and cleaned.
+
               </div>
+
             )}
 
           </div>
 
-          {/* OPTIONS */}
+          {/* =====================================================
+              OPTIONS
+          ===================================================== */}
 
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <div className="mt-8 grid gap-6 md:grid-cols-3">
 
             {/* CLASS NAME */}
 
@@ -410,24 +629,89 @@ export default function PomPage() {
 
               <input
                 type="text"
+
                 value={
                   className
                 }
+
                 onChange={(
                   event
                 ) => {
                   setClassName(
-                    event.target.value
+                    event.target
+                      .value
                   );
 
-                  setResult(null);
+                  setResult(
+                    null
+                  );
+
+                  setCopied(
+                    false
+                  );
                 }}
+
                 placeholder="PageLogin"
+
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
 
               <p className="mt-2 text-sm text-gray-500">
                 Example: PageLogin, PageHome, PageTransfer
+              </p>
+
+            </div>
+
+            {/* LANGUAGE */}
+
+            <div>
+
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Programming Language
+              </label>
+
+              <select
+                value={
+                  language
+                }
+
+                onChange={(
+                  event
+                ) =>
+                  handleLanguageChange(
+                    event.target
+                      .value as PomLanguage
+                  )
+                }
+
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+
+                {LANGUAGE_OPTIONS.map(
+                  (
+                    option
+                  ) => (
+
+                    <option
+                      key={
+                        option.value
+                      }
+                      value={
+                        option.value
+                      }
+                    >
+                      {
+                        option.label
+                      }
+                    </option>
+
+                  )
+                )}
+
+              </select>
+
+              <p className="mt-2 text-sm text-gray-500">
+                Select the programming language first.
               </p>
 
             </div>
@@ -444,35 +728,67 @@ export default function PomPage() {
                 value={
                   framework
                 }
+
                 onChange={(
                   event
-                ) => {
-                  setFramework(
+                ) =>
+                  handleFrameworkChange(
                     event.target
                       .value as PomFramework
-                  );
+                  )
+                }
 
-                  setResult(null);
-                }}
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
 
-                <option value="playwright">
-                  Playwright TypeScript
-                </option>
+                {availableFrameworks.map(
+                  (
+                    frameworkOption
+                  ) => (
 
-                <option value="mobilewright">
-                  Mobilewright TypeScript
-                </option>
+                    <option
+                      key={
+                        frameworkOption
+                      }
+                      value={
+                        frameworkOption
+                      }
+                    >
+                      {
+                        getFrameworkLabel(
+                          frameworkOption
+                        )
+                      }
+                    </option>
+
+                  )
+                )}
 
               </select>
 
               <p className="mt-2 text-sm text-gray-500">
-                Select the automation framework for generated
-                locators and page methods.
+                Available frameworks depend on the selected language.
               </p>
 
             </div>
+
+          </div>
+
+          {/* STACK PREVIEW */}
+
+          <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+
+            <span className="text-sm text-gray-500">
+              Selected stack:
+            </span>
+
+            <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-700">
+              {selectedStack}
+            </span>
+
+            <span className="rounded-full bg-gray-200 px-3 py-1 text-sm font-medium text-gray-700">
+              .{selectedExtension}
+            </span>
 
           </div>
 
@@ -482,29 +798,40 @@ export default function PomPage() {
             onClick={
               generatePom
             }
+
             disabled={
               isGenerating
             }
+
             className="mt-8 w-full rounded-lg bg-blue-600 px-6 py-4 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
           >
+
             {isGenerating
-              ? "QA is generating Page Object Model..."
+              ? `QA is generating ${selectedStack} Page Object...`
               : "Generate Page Object Model"}
+
           </button>
 
           {/* ERROR */}
 
           {error && (
+
             <div className="mt-4 rounded-lg bg-red-50 p-4 text-red-700">
+
               {error}
+
             </div>
+
           )}
 
         </div>
 
-        {/* RESULT */}
+        {/* =====================================================
+            RESULT
+        ===================================================== */}
 
         {result && (
+
           <div className="mt-8 rounded-2xl bg-white p-8 shadow">
 
             {/* RESULT HEADER */}
@@ -536,15 +863,15 @@ export default function PomPage() {
               <div className="flex flex-wrap gap-3">
 
                 <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-                  {result.className}.txt
+
+                  {result.className}.
+                  {result.fileExtension}
+
                 </span>
 
                 <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
 
-                  {result.framework ===
-                  "playwright"
-                    ? "Playwright TypeScript"
-                    : "Mobilewright TypeScript"}
+                  {result.stackLabel}
 
                 </span>
 
@@ -558,21 +885,29 @@ export default function PomPage() {
                   onClick={
                     copyCode
                   }
+
                   className="rounded-lg border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
                 >
+
                   {copied
                     ? "✓ Copied"
                     : "Copy Code"}
+
                 </button>
 
                 <button
                   onClick={
                     downloadCode
                   }
+
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                 >
+
                   Download{" "}
-                  {result.className}.txt
+
+                  {result.className}.
+                  {result.fileExtension}
+
                 </button>
 
               </div>
@@ -583,8 +918,17 @@ export default function PomPage() {
 
             <div className="overflow-hidden rounded-xl bg-gray-950">
 
-              <div className="border-b border-gray-800 px-5 py-3 text-sm text-gray-400">
-                {result.className}.txt
+              <div className="flex items-center justify-between border-b border-gray-800 px-5 py-3 text-sm text-gray-400">
+
+                <span>
+                  {result.className}.
+                  {result.fileExtension}
+                </span>
+
+                <span>
+                  {result.stackLabel}
+                </span>
+
               </div>
 
               <pre className="max-h-[700px] overflow-auto p-6 text-sm leading-6 text-gray-100">
@@ -598,6 +942,7 @@ export default function PomPage() {
             </div>
 
           </div>
+
         )}
 
       </div>
