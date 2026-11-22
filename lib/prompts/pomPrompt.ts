@@ -687,6 +687,50 @@ export class ${className} {
   }
 }
 
+=====================================================
+WEBDRIVERIO SELECTOR PRIORITY
+=====================================================
+
+Prefer selectors based on stable, semantic DOM attributes.
+
+Use this general priority when supported by the DOM:
+
+1. data-testid or another explicit test-specific stable attribute
+2. name
+3. stable id
+4. semantic attributes such as:
+   - input type
+   - button type
+   - href when meaningful and stable
+   - aria attributes when explicitly present
+5. stable CSS selectors
+6. CSS classes only when they clearly represent a stable
+   business or automation identifier
+
+IMPORTANT:
+
+- Prefer semantic element attributes over styling classes.
+- Do NOT use a styling or framework CSS class when a stable
+  name, id, type, test attribute or other semantic selector exists.
+- Avoid selectors such as generated framework classes.
+- Avoid classes primarily used for visual styling.
+- Avoid deeply nested CSS selectors.
+- Avoid nth-child and positional selectors.
+- Avoid XPath unless absolutely necessary.
+- Never invent selector attributes.
+
+For example:
+
+PREFERRED:
+
+$('input[name="username"]')
+
+$('button[type="submit"]')
+
+AVOID WHEN A SEMANTIC SELECTOR EXISTS:
+
+$('.orangehrm-login-button')
+
 Use public selector getters.
 
 Methods must reuse those getters.
@@ -740,7 +784,57 @@ export class ${className} {
   }
 }
 
+=====================================================
+WEBDRIVERIO SELECTOR PRIORITY
+=====================================================
+
+Prefer selectors based on stable, semantic DOM attributes.
+
+Use this general priority when supported by the DOM:
+
+1. data-testid or another explicit test-specific stable attribute
+2. name
+3. stable id
+4. semantic attributes such as:
+   - input type
+   - button type
+   - href when meaningful and stable
+   - aria attributes when explicitly present
+5. stable CSS selectors
+6. CSS classes only when they clearly represent a stable
+   business or automation identifier
+
+IMPORTANT:
+
+- Prefer semantic element attributes over styling classes.
+- Do NOT use a styling or framework CSS class when a stable
+  name, id, type, test attribute or other semantic selector exists.
+- Avoid selectors such as generated framework classes.
+- Avoid classes primarily used for visual styling.
+- Avoid deeply nested CSS selectors.
+- Avoid nth-child and positional selectors.
+- Avoid XPath unless absolutely necessary.
+- Never invent selector attributes.
+
+For example:
+
+PREFERRED:
+
+$('input[name="username"]')
+
+$('button[type="submit"]')
+
+AVOID WHEN A SEMANTIC SELECTOR EXISTS:
+
+$('.orangehrm-login-button')
+
 Use public selector getters.
+
+Methods must reuse those getters.
+
+Do not recreate selectors inside methods.
+
+Do not invent selector attributes.
 
 Do not use TypeScript syntax.
 `;
@@ -1105,6 +1199,8 @@ be convenient for automation.
 10. Avoid fragile selectors based on:
 
 - generated CSS classes
+- styling-only CSS classes
+- framework-specific CSS classes
 - deep DOM hierarchy
 - nth-child
 - nth-of-type
@@ -1112,14 +1208,29 @@ be convenient for automation.
 - dynamic IDs
 - positional selectors
 
-11. XPath should be used only when the selected
+11. Prefer semantic attributes over styling classes
+whenever both are available.
+
+Examples of semantic evidence include:
+
+- name
+- stable id
+- type
+- data-testid
+- aria attributes
+- label
+- placeholder
+- role
+- stable href
+
+12. XPath should be used only when the selected
 framework supports it and no better stable selector exists.
 
 =====================================================
 LOCATOR DESIGN
 =====================================================
 
-12. Locator names must be descriptive and based on
+13. Locator names must be descriptive and based on
 the user-facing purpose.
 
 GOOD examples:
@@ -1143,12 +1254,12 @@ locatorA
 buttonElement
 fieldX
 
-13. Avoid duplicate locators representing the same element.
+14. Avoid duplicate locators representing the same element.
 
-14. Important reusable locators must remain accessible
+15. Important reusable locators must remain accessible
 to the automation layer.
 
-15. Do not hide important locators behind private access
+16. Do not hide important locators behind private access
 when Step Definitions or tests may reasonably need them
 for assertions.
 
@@ -1156,7 +1267,7 @@ for assertions.
 ACTION METHODS
 =====================================================
 
-16. Create reusable methods only for meaningful
+17. Create reusable methods only for meaningful
 user actions supported by the DOM.
 
 Examples:
@@ -1170,18 +1281,18 @@ enterTransferAmount()
 search()
 openMenu()
 
-17. Action methods MUST reuse already declared
+18. Action methods MUST reuse already declared
 locators, selector properties or selector getters.
 
-18. Do NOT recreate selectors inside action methods.
+19. Do NOT recreate selectors inside action methods.
 
-19. Do NOT generate methods for functionality
+20. Do NOT generate methods for functionality
 that is not supported by the DOM.
 
-20. Do NOT create meaningless wrapper methods
+21. Do NOT create meaningless wrapper methods
 just to increase code size.
 
-21. A useful combined workflow method may be added
+22. A useful combined workflow method may be added
 only when it represents an obvious user action
 supported by the supplied DOM.
 
@@ -1194,7 +1305,7 @@ all clearly present.
 ASSERTION RESPONSIBILITY
 =====================================================
 
-22. Do NOT put test assertions inside the Page Object.
+23. Do NOT put test assertions inside the Page Object.
 
 The Page Object should expose:
 
@@ -1211,7 +1322,7 @@ Assertions belong in:
 NO INVENTED BEHAVIOR
 =====================================================
 
-23. Do NOT assume:
+24. Do NOT assume:
 
 - Login success behavior
 - Redirect behavior
@@ -1229,28 +1340,28 @@ NO INVENTED BEHAVIOR
 
 unless directly supported by the supplied input.
 
-24. Do NOT invent URLs.
+25. Do NOT invent URLs.
 
-25. Do NOT generate navigation methods that require
+26. Do NOT generate navigation methods that require
 an invented destination.
 
 =====================================================
 DO NOT GENERATE
 =====================================================
 
-26. Do NOT generate test cases.
+27. Do NOT generate test cases.
 
-27. Do NOT generate BDD scenarios.
+28. Do NOT generate BDD scenarios.
 
-28. Do NOT generate Step Definitions.
+29. Do NOT generate Step Definitions.
 
-29. Do NOT generate fixtures.
+30. Do NOT generate fixtures.
 
-30. Do NOT generate configuration files.
+31. Do NOT generate configuration files.
 
-31. Do NOT generate sample tests.
+32. Do NOT generate sample tests.
 
-32. Do NOT generate explanation text.
+33. Do NOT generate explanation text.
 
 =====================================================
 LANGUAGE QUALITY
@@ -1284,6 +1395,7 @@ Before returning the code verify:
 - selected stack is exactly ${stackLabel}
 - every selector is supported by the DOM
 - no selector is invented
+- semantic selectors are preferred over styling classes
 - no duplicate selector exists
 - action methods reuse declared selectors
 - no unnecessary assertions exist
@@ -1398,31 +1510,34 @@ REVIEW RESPONSIBILITIES
 
 14. Avoid fragile selectors.
 
-15. Keep locator names descriptive.
+15. Prefer semantic selectors over styling or framework CSS classes
+when a stable semantic alternative exists.
 
-16. Keep action methods reusable and user-focused.
+16. Keep locator names descriptive.
 
-17. Action methods MUST reuse selectors already
+17. Keep action methods reusable and user-focused.
+
+18. Action methods MUST reuse selectors already
 declared in the Page Object.
 
-18. Do NOT recreate selectors inside methods.
+19. Do NOT recreate selectors inside methods.
 
-19. Important reusable automation elements must
+20. Important reusable automation elements must
 remain accessible to tests and Step Definitions.
 
-20. Do NOT add assertions to the Page Object.
+21. Do NOT add assertions to the Page Object.
 
-21. Do NOT generate tests.
+22. Do NOT generate tests.
 
-22. Do NOT generate BDD scenarios.
+23. Do NOT generate BDD scenarios.
 
-23. Do NOT generate Step Definitions.
+24. Do NOT generate Step Definitions.
 
-24. Do NOT invent URLs.
+25. Do NOT invent URLs.
 
-25. Do NOT invent redirect behavior.
+26. Do NOT invent redirect behavior.
 
-26. Do NOT invent error or success behavior.
+27. Do NOT invent error or success behavior.
 
 =====================================================
 LANGUAGE QUALITY
@@ -1440,6 +1555,7 @@ Verify:
 - stack is exactly ${stackLabel}
 - selectors exist in the DOM
 - no selector is invented
+- semantic selectors are preferred over styling classes
 - no duplicate locator exists
 - no unused locator exists
 - methods reuse declared selectors
